@@ -199,6 +199,38 @@ Choose the `iota` ordering so the zero value is the sensible default state. In
 tests and log messages, format these values with `%v`/`%s` (which invoke
 `String()`), not `%q` or `%d`.
 
+### 6. Discoverability comes from shallow paths, not re-export facades
+
+As a package family grows (e.g. `pkg/httpkit`), favor many small, focused
+sub-packages reachable by a predictable, shallow import path over a single
+parent that forwards everyone's symbols. Go has no namespaces and no re-export
+syntax: a "one import exposes everything" facade can only be built by
+redeclaring each child symbol in the parent (type aliases for types, assignment
+for consts/vars, and functions cannot be aliased at all — generic functions
+least of all). That mirror has to be hand-maintained for every new symbol and
+ages badly. Do not build one.
+
+Discoverability is instead achieved by:
+
+- **Shallow, self-evident paths.** One path segment per concept, no empty
+  grouping directories (`httpkit/healthcheck`, not `httpkit/handlers/healthcheck`).
+  The import path *is* the discovery path, the same way the standard library
+  uses `net/http`, `net/url`, `net/http/httptest`.
+- **A parent `doc.go`/package comment that indexes the sub-packages**, one line
+  each with the full import path. This renders as a navigable table of contents
+  on `go doc` and pkg.go.dev. Keep it updated when a sub-package is added.
+- **A lean parent package** that holds only genuinely shared contracts — things
+  used *across* children or *without* any specific child (e.g.
+  `httpkit.Headers`, `httpkit.DecodeJSON`) — never forwarded copies of child
+  symbols.
+
+The one facade that is idiomatic is a **composition entry point**: a parent
+function that imports the children and offers a high-value combined behavior
+(e.g. a hypothetical `httpkit.Install(mux, …)` that wires every standard
+endpoint onto a mux). That adds behavior rather than forwarding names. Add it
+only when a concrete "wire it all up at once" use case exists, not
+speculatively.
+
 ## Code style
 
 - Format with `gofmt`. The linter also enforces `golines` and `goimports`, so

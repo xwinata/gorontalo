@@ -2,16 +2,28 @@
 // handlers and the shared conventions they rely on. It has no third-party
 // dependencies.
 //
-// The handlers live in subpackages:
+// # Sub-packages
 //
-//   - healthcheck serves health, liveness, and readiness endpoints.
-//   - stdwrapper adapts application handlers to a standard
-//     request/response contract (request ID, response envelope, error-code
-//     header, logging, panic recovery).
+// Each handler is its own package; import the one you need directly. This
+// package does not re-export them, so the import path is the discovery path:
 //
-// This package re-exports the standard header names those handlers use so
-// callers can reference them without importing a specific handler subpackage.
-// They are grouped under the Headers namespace:
+//   - goliath/pkg/httpkit/healthcheck — health, liveness, and readiness
+//     endpoints for orchestrators such as Kubernetes.
+//   - goliath/pkg/httpkit/stdwrapper — adapts application handlers to a
+//     standard request/response contract (request ID, response envelope,
+//     error-code header, logging, panic recovery).
+//
+// New presets are added as sibling sub-packages under goliath/pkg/httpkit and
+// listed here, so this comment stays the index of what the kit offers.
+//
+// # Shared contracts
+//
+// This package itself holds only what is shared across those sub-packages or
+// useful without any of them, not forwarded copies of their symbols.
+//
+// It re-exports the standard header names the handlers use so callers can
+// reference them without importing a specific handler sub-package. They are
+// grouped under the Headers namespace:
 //
 //	req.Header.Get(httpkit.Headers.RequestID)
 //	resp.Header.Get(httpkit.Headers.ErrorCode)
