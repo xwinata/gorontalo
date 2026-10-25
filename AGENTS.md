@@ -281,6 +281,15 @@ go test ./pkg/httpkit/healthcheck/ -v
 go generate ./tools
 ```
 
+## Commits
+
+Write commit messages as [Conventional Commits](https://www.conventionalcommits.org/):
+a `type(scope): summary` subject line, where `scope` is the affected package or
+area (e.g. `fileconfig`, `httpkit`, `mod`). Types used in this repo: `feat`,
+`fix`, `refactor`, `docs`, `chore`, `build`. Keep the summary imperative and
+under ~70 characters; use the body to explain *what* and *why*. Keep unrelated
+changes in separate commits.
+
 ## Definition of done
 
 Before considering a change complete:
