@@ -16,7 +16,7 @@ import "gorontalo/pkg/database"
 
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/database/database.go#L14-L35>)
+## type [Config](<https://github.com/xwinata/gorontalo/blob/main/pkg/database/database.go#L14-L35>)
 
 Config holds the settings required to connect to a database.
 
@@ -46,7 +46,7 @@ type Config struct {
 ```
 
 <a name="Database"></a>
-## type [Database](<https://github.com/xwinata/goliath/blob/main/pkg/database/interfaces.go#L8-L17>)
+## type [Database](<https://github.com/xwinata/gorontalo/blob/main/pkg/database/interfaces.go#L8-L17>)
 
 
 
@@ -64,7 +64,7 @@ type Database interface {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/goliath/blob/main/pkg/database/database.go#L53>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/database/database.go#L53>)
 
 ```go
 func New(cfg Config) Database
@@ -73,7 +73,7 @@ func New(cfg Config) Database
 New builds a Database from the given config. The actual connection is opened lazily on the first call to Connection\(\).
 
 <a name="Dialect"></a>
-## type [Dialect](<https://github.com/xwinata/goliath/blob/main/pkg/database/constants.go#L4>)
+## type [Dialect](<https://github.com/xwinata/gorontalo/blob/main/pkg/database/constants.go#L4>)
 
 Dialect identifies the SQL dialect a Database speaks.
 
@@ -94,7 +94,7 @@ const (
 ```
 
 <a name="Executor"></a>
-## type [Executor](<https://github.com/xwinata/goliath/blob/main/pkg/database/interfaces.go#L22-L34>)
+## type [Executor](<https://github.com/xwinata/gorontalo/blob/main/pkg/database/interfaces.go#L22-L34>)
 
 Executor abstracts the query\-execution methods that are common to both \*sql.DB and \*sql.Tx, so callers can operate against either a connection pool or an in\-progress transaction interchangeably.
 

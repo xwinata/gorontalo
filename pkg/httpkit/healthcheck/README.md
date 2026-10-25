@@ -47,7 +47,7 @@ Register may target any \*http.ServeMux, so these endpoints can share a mux with
 
 
 <a name="Check"></a>
-## type [Check](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/options.go#L8>)
+## type [Check](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/options.go#L8>)
 
 Check reports whether a dependency is healthy. It returns nil when the dependency is ready and a non\-nil error describing the problem otherwise. The context carries the request deadline, so a Check should respect cancellation.
 
@@ -56,7 +56,7 @@ type Check func(ctx context.Context) error
 ```
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/options.go#L13-L35>)
+## type [Config](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/options.go#L13-L35>)
 
 Config customizes a Handler created by New. The zero value is valid: empty paths fall back to their package defaults, and nil check maps mean the corresponding probe simply confirms the process is up.
 
@@ -87,7 +87,7 @@ type Config struct {
 ```
 
 <a name="Handler"></a>
-## type [Handler](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L115-L121>)
+## type [Handler](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L115-L121>)
 
 Handler serves the health, liveness, and readiness endpoints. Create one with New and wire it into a mux with Register.
 
@@ -98,7 +98,7 @@ type Handler struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L126>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L126>)
 
 ```go
 func New(cfg Config) *Handler
@@ -107,7 +107,7 @@ func New(cfg Config) *Handler
 New creates a Handler configured by cfg. A zero\-value Config serves the default paths with no readiness or liveness checks \(so both probes simply confirm the process is up\).
 
 <a name="Handler.Register"></a>
-### func \(\*Handler\) [Register](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L140>)
+### func \(\*Handler\) [Register](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L140>)
 
 ```go
 func (h *Handler) Register(mux *http.ServeMux)
@@ -116,7 +116,7 @@ func (h *Handler) Register(mux *http.ServeMux)
 Register mounts the Handler's endpoints on mux. It registers the health, liveness, and readiness paths, each restricted to GET.
 
 <a name="Status"></a>
-## type [Status](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L56>)
+## type [Status](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L56>)
 
 Status is the condition reported in a probe response body. Its zero value is StatusOK.
 
@@ -136,7 +136,7 @@ const (
 ```
 
 <a name="Status.MarshalJSON"></a>
-### func \(Status\) [MarshalJSON](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L80>)
+### func \(Status\) [MarshalJSON](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L80>)
 
 ```go
 func (s Status) MarshalJSON() ([]byte, error)
@@ -145,7 +145,7 @@ func (s Status) MarshalJSON() ([]byte, error)
 MarshalJSON encodes the Status as its String label so probe response bodies stay stable \(e.g. \{"status":"ok"\}\) regardless of the underlying int values.
 
 <a name="Status.String"></a>
-### func \(Status\) [String](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L67>)
+### func \(Status\) [String](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L67>)
 
 ```go
 func (s Status) String() string
@@ -154,7 +154,7 @@ func (s Status) String() string
 String returns the lowercase label for s, e.g. "ok" or "unavailable". Unknown values render as "unknown".
 
 <a name="Status.UnmarshalJSON"></a>
-### func \(\*Status\) [UnmarshalJSON](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L86>)
+### func \(\*Status\) [UnmarshalJSON](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L86>)
 
 ```go
 func (s *Status) UnmarshalJSON(data []byte) error

@@ -81,7 +81,7 @@ const HeaderRequestID = "X-Request-ID"
 ```
 
 <a name="BodyLimitFromContext"></a>
-## func [BodyLimitFromContext](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/context.go#L44>)
+## func [BodyLimitFromContext](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/context.go#L44>)
 
 ```go
 func BodyLimitFromContext(ctx context.Context) (limit int64, ok bool)
@@ -90,7 +90,7 @@ func BodyLimitFromContext(ctx context.Context) (limit int64, ok bool)
 BodyLimitFromContext returns the request\-body byte cap the wrapper already applied, and reports whether a wrapper handled this request at all. A limit of 0 or less means the wrapper deliberately left the body uncapped. Body readers can use ok to decide whether they still need to apply their own cap: when ok is true the body is already bounded \(or intentionally unbounded\) and a second cap would be redundant.
 
 <a name="RequestIDFromContext"></a>
-## func [RequestIDFromContext](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/context.go#L25>)
+## func [RequestIDFromContext](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/context.go#L25>)
 
 ```go
 func RequestIDFromContext(ctx context.Context) (string, bool)
@@ -99,7 +99,7 @@ func RequestIDFromContext(ctx context.Context) (string, bool)
 RequestIDFromContext returns the request ID stored on ctx by the wrapper, and reports whether one was present. Handlers invoked through Wrap can use it to include the request ID in their own logs or downstream calls.
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/options.go#L13-L44>)
+## type [Config](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/options.go#L13-L44>)
 
 Config holds the service\-wide settings shared by every handler a Wrapper produces. Create a Wrapper once with New\(Config\{...\}\) and reuse it across routes; per\-route overrides go in RouteConfig passed to Wrap.
 
@@ -141,7 +141,7 @@ type Config struct {
 ```
 
 <a name="HandlerFunc"></a>
-## type [HandlerFunc](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L112>)
+## type [HandlerFunc](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L112>)
 
 HandlerFunc is the contract for a wrapped handler. It returns the data to send on success and an error on failure, rather than writing the response itself. A nil error means success; the returned data is placed in the response envelope's "data" field \(which is omitted when data is nil\).
 
@@ -150,7 +150,7 @@ type HandlerFunc func(w http.ResponseWriter, r *http.Request) (data any, err err
 ```
 
 <a name="RouteConfig"></a>
-## type [RouteConfig](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/options.go#L49-L57>)
+## type [RouteConfig](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/options.go#L49-L57>)
 
 RouteConfig holds per\-route overrides applied on top of a Wrapper's global Config. The zero value is valid and changes nothing: every empty field inherits the Wrapper's corresponding Config value.
 
@@ -167,7 +167,7 @@ type RouteConfig struct {
 ```
 
 <a name="Wrapper"></a>
-## type [Wrapper](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L131-L133>)
+## type [Wrapper](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L131-L133>)
 
 Wrapper adapts handlers to the standard contract using a shared, service\-wide Config. Create it with New and call Wrap for each route. A Wrapper is safe for concurrent use; its resolved config is immutable after New.
 
@@ -178,7 +178,7 @@ type Wrapper struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L124>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L124>)
 
 ```go
 func New(cfg Config) *Wrapper
@@ -187,7 +187,7 @@ func New(cfg Config) *Wrapper
 New creates a Wrapper carrying the service\-wide Config. Build one at startup and reuse it across routes; the zero\-value Config selects standard defaults. Per\-route settings are supplied to Wrap via RouteConfig.
 
 <a name="Wrapper.Wrap"></a>
-### func \(\*Wrapper\) [Wrap](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L139>)
+### func \(\*Wrapper\) [Wrap](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L139>)
 
 ```go
 func (wp *Wrapper) Wrap(h HandlerFunc, rc RouteConfig) http.Handler

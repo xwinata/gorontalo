@@ -34,7 +34,7 @@ frames := tracer.Trace(tracer.Config{
 
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/tracer/tracer.go#L41-L53>)
+## type [Config](<https://github.com/xwinata/gorontalo/blob/main/pkg/tracer/tracer.go#L41-L53>)
 
 Config tunes Trace. The zero value is valid: Skip \<= 0 keeps the default \(skip Trace itself and runtime.Callers so the first frame is Trace's caller\), MaxDepth \<= 0 keeps the default cap, and a nil Filter captures every frame.
 
@@ -55,7 +55,7 @@ type Config struct {
 ```
 
 <a name="Frame"></a>
-## type [Frame](<https://github.com/xwinata/goliath/blob/main/pkg/tracer/tracer.go#L23-L27>)
+## type [Frame](<https://github.com/xwinata/gorontalo/blob/main/pkg/tracer/tracer.go#L23-L27>)
 
 Frame is a single stack frame with its file, line, and function name.
 
@@ -68,7 +68,7 @@ type Frame struct {
 ```
 
 <a name="Trace"></a>
-### func [Trace](<https://github.com/xwinata/goliath/blob/main/pkg/tracer/tracer.go#L75>)
+### func [Trace](<https://github.com/xwinata/gorontalo/blob/main/pkg/tracer/tracer.go#L75>)
 
 ```go
 func Trace(cfg Config) []Frame

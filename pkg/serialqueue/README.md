@@ -47,7 +47,7 @@ const DefaultCapacity = 5
 ```
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/options.go#L8-L23>)
+## type [Config](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/options.go#L8-L23>)
 
 Config customizes a Queue created by New. The zero value is valid: Capacity \<= 0 selects DefaultCapacity, a zero Timeout waits indefinitely, and a nil PanicHandler recovers panicking jobs silently.
 
@@ -71,7 +71,7 @@ type Config struct {
 ```
 
 <a name="Queue"></a>
-## type [Queue](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L57-L66>)
+## type [Queue](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L57-L66>)
 
 Queue runs jobs serially with a bounded FIFO backlog.
 
@@ -82,7 +82,7 @@ type Queue struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L70>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L70>)
 
 ```go
 func New(cfg Config) *Queue
@@ -91,7 +91,7 @@ func New(cfg Config) *Queue
 New creates a Queue configured by cfg. A zero\-value Config yields a queue with DefaultCapacity, no timeout, and silent panic recovery.
 
 <a name="Queue.IsRunning"></a>
-### func \(\*Queue\) [IsRunning](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L185>)
+### func \(\*Queue\) [IsRunning](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L185>)
 
 ```go
 func (q *Queue) IsRunning() bool
@@ -100,7 +100,7 @@ func (q *Queue) IsRunning() bool
 IsRunning reports whether a job is currently running.
 
 <a name="Queue.IsWaiting"></a>
-### func \(\*Queue\) [IsWaiting](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L193>)
+### func \(\*Queue\) [IsWaiting](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L193>)
 
 ```go
 func (q *Queue) IsWaiting() bool
@@ -109,7 +109,7 @@ func (q *Queue) IsWaiting() bool
 IsWaiting reports whether at least one live job is queued behind the running one.
 
 <a name="Queue.Run"></a>
-### func \(\*Queue\) [Run](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L84>)
+### func \(\*Queue\) [Run](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L84>)
 
 ```go
 func (q *Queue) Run(job func()) Result
@@ -118,7 +118,7 @@ func (q *Queue) Run(job func()) Result
 Run submits a job and returns immediately. The job runs once earlier submissions finish. It returns Rejected if the backlog is full or job is nil. To run several jobs as one unit, wrap them in a single func. If the queue was created with a Config.Timeout, the wait is bounded by that timeout.
 
 <a name="Queue.RunContext"></a>
-### func \(\*Queue\) [RunContext](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L93>)
+### func \(\*Queue\) [RunContext](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L93>)
 
 ```go
 func (q *Queue) RunContext(ctx context.Context, job func()) Result
@@ -127,7 +127,7 @@ func (q *Queue) RunContext(ctx context.Context, job func()) Result
 RunContext behaves like Run but also drops the job if ctx is canceled or its deadline passes before it starts. A per\-queue timeout from Config.Timeout still applies; whichever fires first wins. Cancellation only affects a job still waiting, never one that has already started.
 
 <a name="Queue.Waiting"></a>
-### func \(\*Queue\) [Waiting](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L202>)
+### func \(\*Queue\) [Waiting](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L202>)
 
 ```go
 func (q *Queue) Waiting() int
@@ -136,7 +136,7 @@ func (q *Queue) Waiting() int
 Waiting returns the number of live jobs currently queued behind the running one. Batches canceled while waiting are excluded.
 
 <a name="Result"></a>
-## type [Result](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L27>)
+## type [Result](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L27>)
 
 Result reports the outcome of submitting a job.
 
@@ -156,7 +156,7 @@ const (
 ```
 
 <a name="Result.String"></a>
-### func \(Result\) [String](<https://github.com/xwinata/goliath/blob/main/pkg/serialqueue/serialqueue.go#L37>)
+### func \(Result\) [String](<https://github.com/xwinata/gorontalo/blob/main/pkg/serialqueue/serialqueue.go#L37>)
 
 ```go
 func (r Result) String() string

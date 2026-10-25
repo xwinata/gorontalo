@@ -59,7 +59,7 @@ if errors.As(err, &se) {
 
 
 <a name="Code"></a>
-## func [Code](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L254>)
+## func [Code](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L254>)
 
 ```go
 func Code(err error) string
@@ -68,7 +68,7 @@ func Code(err error) string
 Code returns the application error code carried by the nearest \*StdErr in err's chain, or "" when none is present.
 
 <a name="StackTrace"></a>
-## func [StackTrace](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L274>)
+## func [StackTrace](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L274>)
 
 ```go
 func StackTrace(err error) []tracer.Frame
@@ -77,7 +77,7 @@ func StackTrace(err error) []tracer.Frame
 StackTrace returns the stack trace carried by the nearest \*StdErr in err's chain, or nil when none is present.
 
 <a name="Status"></a>
-## func [Status](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L264>)
+## func [Status](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L264>)
 
 ```go
 func Status(err error) int
@@ -86,7 +86,7 @@ func Status(err error) int
 Status returns the HTTP status carried by the nearest \*StdErr in err's chain, or 0 when none is present.
 
 <a name="Options"></a>
-## type [Options](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L72-L97>)
+## type [Options](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L72-L97>)
 
 Options configures a StdErr created by New. The zero value is valid: it produces an error with no code, no status, and the default trace settings. Only Message is normally required.
 
@@ -120,7 +120,7 @@ type Options struct {
 ```
 
 <a name="StdErr"></a>
-## type [StdErr](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L102-L113>)
+## type [StdErr](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L102-L113>)
 
 StdErr is an error carrying a message, an optional cause, a captured stack trace, an application\-level error code, and an HTTP status. Create one with New and inspect it with errors.As.
 
@@ -131,7 +131,7 @@ type StdErr struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L124>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L124>)
 
 ```go
 func New(err error, opts Options) *StdErr
@@ -142,7 +142,7 @@ New creates a \*StdErr wrapping err. When err is nil the result originates a new
 When err unwraps to another \*StdErr, any of Message, Code, and Status left empty on opts are inherited from the nearest ancestor \*StdErr that sets them. This lets a caller re\-wrap a standard error to add context to one field \(say, a message\) while the code and status flow up unchanged.
 
 <a name="StdErr.Code"></a>
-### func \(\*StdErr\) [Code](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L210>)
+### func \(\*StdErr\) [Code](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L210>)
 
 ```go
 func (e *StdErr) Code() string
@@ -151,7 +151,7 @@ func (e *StdErr) Code() string
 Code returns the application\-level error code. When this error does not set one, Code looks down the chain for the nearest \*StdErr that does and returns its code; it returns "" when none is found.
 
 <a name="StdErr.Error"></a>
-### func \(\*StdErr\) [Error](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L190>)
+### func \(\*StdErr\) [Error](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L190>)
 
 ```go
 func (e *StdErr) Error() string
@@ -160,7 +160,7 @@ func (e *StdErr) Error() string
 Error implements the error interface. It renders the message followed by the cause, if any, so the chain reads from outermost to innermost. When the message was inherited from the cause \(so it already equals the cause's rendered form\), it is not repeated.
 
 <a name="StdErr.StackTrace"></a>
-### func \(\*StdErr\) [StackTrace](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L238>)
+### func \(\*StdErr\) [StackTrace](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L238>)
 
 ```go
 func (e *StdErr) StackTrace() []tracer.Frame
@@ -169,7 +169,7 @@ func (e *StdErr) StackTrace() []tracer.Frame
 StackTrace returns the captured call stack. If this error wraps another \*StdErr, it returns that error's trace so the origin frames are preserved. Otherwise it captures the trace on first call and caches it.
 
 <a name="StdErr.Status"></a>
-### func \(\*StdErr\) [Status](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L224>)
+### func \(\*StdErr\) [Status](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L224>)
 
 ```go
 func (e *StdErr) Status() int
@@ -178,7 +178,7 @@ func (e *StdErr) Status() int
 Status returns the HTTP status. When this error does not set one, Status looks down the chain for the nearest \*StdErr that does and returns its status; it returns 0 when none is found.
 
 <a name="StdErr.Unwrap"></a>
-### func \(\*StdErr\) [Unwrap](<https://github.com/xwinata/goliath/blob/main/pkg/stderr/stderr.go#L203>)
+### func \(\*StdErr\) [Unwrap](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L203>)
 
 ```go
 func (e *StdErr) Unwrap() error

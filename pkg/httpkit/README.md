@@ -54,7 +54,7 @@ var Headers = headerNames{
 ```
 
 <a name="DecodeJSON"></a>
-## func [DecodeJSON](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/decodejson.go#L43>)
+## func [DecodeJSON](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/decodejson.go#L43>)
 
 ```go
 func DecodeJSON[T any](r *http.Request) (T, error)
@@ -81,7 +81,7 @@ func create(w http.ResponseWriter, r *http.Request) (any, error) {
 ```
 
 <a name="DecodeJSONMax"></a>
-## func [DecodeJSONMax](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/decodejson.go#L65>)
+## func [DecodeJSONMax](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/decodejson.go#L65>)
 
 ```go
 func DecodeJSONMax[T any](r *http.Request, maxBytes int64) (T, error)
@@ -90,7 +90,7 @@ func DecodeJSONMax[T any](r *http.Request, maxBytes int64) (T, error)
 DecodeJSONMax is DecodeJSON with an explicit body size limit in bytes. A maxBytes of zero or less disables the limit, decoding the body unbounded; only do that for trusted input. All other behavior — strict decoding and the 400 \*stderr.StdErr on failure — matches DecodeJSON.
 
 <a name="DecodeJSONReader"></a>
-## func [DecodeJSONReader](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/decodejson.go#L79>)
+## func [DecodeJSONReader](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/decodejson.go#L79>)
 
 ```go
 func DecodeJSONReader[T any](body io.Reader) (T, error)
