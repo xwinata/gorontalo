@@ -10,7 +10,7 @@ to this file rather than restating or overriding it.
 
 ## Project overview
 
-`goliath` (`module goliath`, Go 1.27) is a single Go module intended to hold all
+`gorontalo` (`module gorontalo`, Go 1.27) is a single Go module intended to hold all
 of this author's Go code. It follows the
 [golang-standards/project-layout](https://github.com/golang-standards/project-layout)
 convention, so directories are added as the repo grows — for example `cmd/`
@@ -18,7 +18,7 @@ convention, so directories are added as the repo grows — for example `cmd/`
 and so on. Only add a top-level directory when there is code to put in it, and
 place it according to that layout.
 
-Import paths are module-relative, e.g. `import "goliath/pkg/logger"`.
+Import paths are module-relative, e.g. `import "gorontalo/pkg/logger"`.
 
 ### Current layout
 
@@ -32,7 +32,7 @@ Import paths are module-relative, e.g. `import "goliath/pkg/logger"`.
     health, liveness, and readiness endpoints; `stdwrapper` adapts
     application handlers to a standard request/response contract (request ID,
     response envelope, error-code header, logging, panic recovery).
-  - `pkg/standarderror` — errors carrying a message, stack trace (via
+  - `pkg/stderr` — errors carrying a message, stack trace (via
     `pkg/tracer`), an application error code, and an HTTP status.
 - `tools/` — build-time tooling (see "Documentation" below).
 
@@ -47,11 +47,16 @@ These are the load-bearing conventions. Match them in any new or modified code.
 ### 1. Minimal dependencies, prefer the standard library
 
 Packages lean on the Go standard library. `logger` and `tracer` have zero
-third-party dependencies; `httpkit` and `standarderror` use only the standard
-library plus other in-repo `pkg/` packages. Do not add a third-party dependency
-to a `pkg/` package unless there is no reasonable stdlib path and the user has
-agreed. Third-party modules in `go.mod` are build/tooling deps, not runtime deps
-of the library packages.
+third-party *and* zero in-repo dependencies and must stay that way — they are
+the foundation other packages build on. `stderr` uses only the standard library
+plus `tracer`. `httpkit` (including `healthcheck`) and `database` use only the
+standard library plus other in-repo `pkg/` packages: notably they return errors
+via `stderr` so failures carry an application code and HTTP status. Standardize
+error returns on `stderr` at and above the HTTP/service boundary; keep the
+foundational `logger`/`tracer` packages on stdlib errors. Do not add a
+third-party dependency to a `pkg/` package unless there is no reasonable stdlib
+path and the user has agreed. Third-party modules in `go.mod` are build/tooling
+deps, not runtime deps of the library packages.
 
 ### 2. Parameter struct for configuration
 
@@ -112,9 +117,9 @@ reference them. Keep a default unexported when callers are unlikely to need it
 
 Do not add functional options (`WithX(...) Option`) to new or existing `pkg/`
 code; the parameter struct is the standard across every configurable
-constructor here (`logger.Init`, `tracer.Trace`, `serialqueue.New`,
+constructor here (`logger.New`, `tracer.Trace`, `serialqueue.New`,
 `httpkit/healthcheck.New`, `httpkit/stdwrapper.Wrap`, and
-`standarderror.New`).
+`stderr.New`).
 
 ### 3. Documentation is part of the code
 

@@ -3,8 +3,11 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 	"net/url"
 	"sync"
+
+	"gorontalo/pkg/stderr"
 )
 
 // Config holds the settings required to connect to a database.
@@ -108,8 +111,16 @@ func (c Config) dsn() (driver, dsn string, err error) {
 		// SQLite is file-based; Database holds the file path.
 		return "sqlite", c.Database, nil
 	case "":
-		return "", "", fmt.Errorf("database %q: dialect is required", c.Name)
+		return "", "", stderr.New(nil, stderr.Options{
+			Message: fmt.Sprintf("database %q: dialect is required", c.Name),
+			Code:    "DIALECT_REQUIRED",
+			Status:  http.StatusBadRequest,
+		})
 	default:
-		return "", "", fmt.Errorf("database %q: unsupported dialect %q", c.Name, c.Dialect)
+		return "", "", stderr.New(nil, stderr.Options{
+			Message: fmt.Sprintf("database %q: unsupported dialect %q", c.Name, c.Dialect),
+			Code:    "UNSUPPORTED_DIALECT",
+			Status:  http.StatusBadRequest,
+		})
 	}
 }

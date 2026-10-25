@@ -2,7 +2,7 @@
 // It wraps a handler that returns a value and an error, reads standard request
 // headers, writes a standard JSON response envelope, logs failures, and
 // recovers from panics. It depends only on the standard library plus the
-// in-repo goliath/pkg/logger, goliath/pkg/tracer, and goliath/pkg/standarderror
+// in-repo gorontalo/pkg/logger, gorontalo/pkg/tracer, and gorontalo/pkg/stderr
 // packages.
 //
 // A wrapped handler has the signature HandlerFunc: it returns the data to send
@@ -20,15 +20,16 @@
 //     "message": ...}; failed responses carry {"message": ...} with the error
 //     message. The envelope never includes the application error code.
 //   - Error code: the application-level error code (from
-//     goliath/pkg/standarderror) is sent on the error-code response header
+//     gorontalo/pkg/stderr) is sent on the error-code response header
 //     (HeaderErrorCode by default, overridable with Config.ErrorCodeHeader),
 //     separate from the HTTP status.
 //   - Status mapping: the HTTP status comes from the error's Status when set
-//     (see goliath/pkg/standarderror), falling back to 500 for errors and 200
+//     (see gorontalo/pkg/stderr), falling back to 500 for errors and 200
 //     for success.
-//   - Logging: failures and recovered panics are logged with
-//     goliath/pkg/logger at error level, including the request ID and (for
-//     standard errors) the captured stack trace.
+//   - Logging: when a [logger.Logger] is supplied via Config.Logger, failures
+//     and recovered panics are logged at error level, including the request ID
+//     and (for standard errors) the captured stack trace. With no logger
+//     configured, request handling is unchanged but nothing is logged.
 //   - Panic recovery: a panic in the handler is recovered, logged, and turned
 //     into a 500 response so the server stays up.
 //   - Body limit: the request body is capped with http.MaxBytesReader
@@ -53,8 +54,7 @@
 //	    func(w http.ResponseWriter, r *http.Request) (any, error) {
 //	        u, err := store.Load(r.Context(), r.PathValue("id"))
 //	        if err != nil {
-//	            return nil, standarderror.New(standarderror.Params{
-//	                Err:     err,
+//	            return nil, stderr.New(err, stderr.Options{
 //	                Message: "user not found",
 //	                Code:    "USER_NOT_FOUND",
 //	                Status:  http.StatusNotFound,
@@ -79,8 +79,8 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"goliath/pkg/logger"
-	"goliath/pkg/standarderror"
+	"gorontalo/pkg/logger"
+	"gorontalo/pkg/stderr"
 )
 
 // HeaderRequestID is the default request/response header carrying the request
@@ -196,31 +196,34 @@ func (wr *wrapper) writeError(
 	requestID string,
 	err error,
 ) {
-	status := standarderror.Status(err)
+	status := stderr.Status(err)
 	if status == 0 {
 		status = http.StatusInternalServerError
 	}
 
-	if code := standarderror.Code(err); code != "" {
+	if code := stderr.Code(err); code != "" {
 		w.Header().Set(wr.cfg.errorCodeHeader, code)
 	}
 
-	logger.ErrorContext(ctx, "request failed", err,
-		logger.F("request_id", requestID),
-		logger.F("status", status),
-		logger.F("error_code", standarderror.Code(err)),
-		logger.F("stack", standarderror.StackTrace(err)),
-	)
+	if log := wr.cfg.logger; log != nil {
+		log.Error(ctx, err,
+			logger.Attr{Key: "event", Value: "request failed"},
+			logger.Attr{Key: "request_id", Value: requestID},
+			logger.Attr{Key: "status", Value: status},
+			logger.Attr{Key: "error_code", Value: stderr.Code(err)},
+			logger.Attr{Key: "stack", Value: stderr.StackTrace(err)},
+		)
+	}
 
 	writeJSON(w, status, envelope{Message: wr.errorMessage(err)})
 }
 
 // errorMessage chooses the message shown to the client for err. To avoid
 // leaking internal detail from wrapped causes, it surfaces a message only for a
-// *standarderror.Error (the application's own, deliberately client-facing
+// *stderr.StdErr (the application's own, deliberately client-facing
 // message); any other error yields the configured generic default.
 func (wr *wrapper) errorMessage(err error) string {
-	var se *standarderror.Error
+	var se *stderr.StdErr
 	if errors.As(err, &se) {
 		if msg := se.Error(); msg != "" {
 			return msg
@@ -234,7 +237,7 @@ func (wr *wrapper) errorMessage(err error) string {
 // panic.
 //
 // The stack is captured with runtime/debug.Stack rather than from a
-// standarderror. A standarderror created here would capture the stack of the
+// stderr. A stderr created here would capture the stack of the
 // recovery site (this deferred function), since the panicking frames have begun
 // to unwind; debug.Stack instead records the full goroutine stack, which still
 // includes the panic's origin while this deferred function runs.
@@ -244,16 +247,19 @@ func (wr *wrapper) recoverPanic(ctx context.Context, w http.ResponseWriter, requ
 		return
 	}
 
-	err := standarderror.New(standarderror.Params{
+	err := stderr.New(nil, stderr.Options{
 		Message: "panic recovered",
 		Status:  http.StatusInternalServerError,
 	})
 
-	logger.ErrorContext(ctx, "request panicked", err,
-		logger.F("request_id", requestID),
-		logger.F("panic", rec),
-		logger.F("stack", string(debug.Stack())),
-	)
+	if log := wr.cfg.logger; log != nil {
+		log.Error(ctx, err,
+			logger.Attr{Key: "event", Value: "request panicked"},
+			logger.Attr{Key: "request_id", Value: requestID},
+			logger.Attr{Key: "panic", Value: rec},
+			logger.Attr{Key: "stack", Value: string(debug.Stack())},
+		)
+	}
 
 	writeJSON(w, http.StatusInternalServerError, envelope{Message: wr.cfg.errorMessage})
 }

@@ -1,6 +1,6 @@
-module goliath
+module gorontalo
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/Microsoft/go-winio v0.5.0 // indirect

@@ -1,5 +1,7 @@
 package stdwrapper
 
+import "gorontalo/pkg/logger"
+
 // Config holds the service-wide settings shared by every handler a Wrapper
 // produces. Create a Wrapper once with New(Config{...}) and reuse it across
 // routes; per-route overrides go in RouteConfig passed to Wrap.
@@ -34,6 +36,11 @@ type Config struct {
 	// when the error carries no client-facing message of its own. Empty selects
 	// defaultErrorMessage. A route may override it with RouteConfig.ErrorMessage.
 	ErrorMessage string
+
+	// Logger receives error-level logs for failed and panicking requests. It is
+	// an injected dependency: there is no package-level default. When nil, the
+	// wrapper runs without logging (request handling is otherwise unchanged).
+	Logger *logger.Logger
 }
 
 // RouteConfig holds per-route overrides applied on top of a Wrapper's global
@@ -58,6 +65,7 @@ type resolvedConfig struct {
 	requestIDHeader string
 	errorCodeHeader string
 	maxBodyBytes    int64
+	logger          *logger.Logger
 }
 
 // resolved returns the global settings with empty fields replaced by their
@@ -70,6 +78,7 @@ func (c Config) resolved() resolvedConfig {
 		requestIDHeader: c.RequestIDHeader,
 		errorCodeHeader: c.ErrorCodeHeader,
 		maxBodyBytes:    c.MaxBodyBytes,
+		logger:          c.Logger,
 	}
 	if r.successMessage == "" {
 		r.successMessage = defaultSuccessMessage

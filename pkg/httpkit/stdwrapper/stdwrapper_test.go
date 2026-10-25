@@ -11,25 +11,27 @@ import (
 	"strings"
 	"testing"
 
-	"goliath/pkg/logger"
-	"goliath/pkg/standarderror"
+	"gorontalo/pkg/logger"
+	"gorontalo/pkg/stderr"
 )
 
-// captureLogs routes the package logger to a buffer for the duration of the
-// test and returns the buffer. It restores the default logger on cleanup.
-func captureLogs(t *testing.T) *bytes.Buffer {
+// captureLogs builds a Logger that writes JSON into a buffer and returns both.
+// Inject the logger into Config.Logger and assert on the buffer. The logger is
+// closed on cleanup.
+func captureLogs(t *testing.T) (*logger.Logger, *bytes.Buffer) {
 	t.Helper()
 	buf := &bytes.Buffer{}
-	if err := logger.Init(logger.Config{
+	log, err := logger.New(logger.Config{
 		DisableBuiltinWriters: true,
 		CustomWriters:         []io.Writer{buf},
 		Level:                 logger.LevelDebug,
 		Format:                logger.FormatJSON,
-	}); err != nil {
-		t.Fatalf("logger.Init: %v", err)
+	})
+	if err != nil {
+		t.Fatalf("logger.New: %v", err)
 	}
-	t.Cleanup(func() { _ = logger.Init(logger.Config{}) })
-	return buf
+	t.Cleanup(func() { _ = log.Close() })
+	return log, buf
 }
 
 // do serves req against the wrapped handler and returns the recorder.
@@ -49,8 +51,8 @@ func decodeEnvelope(t *testing.T, rec *httptest.ResponseRecorder) envelope {
 }
 
 func TestSuccessEnvelopeAndStatus(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
+	log, _ := captureLogs(t)
+	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
 		return map[string]string{"name": "alice"}, nil
 	}, RouteConfig{})
 
@@ -70,9 +72,9 @@ func TestSuccessEnvelopeAndStatus(t *testing.T) {
 }
 
 func TestRequestIDGeneratedWhenAbsent(t *testing.T) {
-	captureLogs(t)
+	log, _ := captureLogs(t)
 	var seen string
-	h := New(Config{}).Wrap(func(_ http.ResponseWriter, r *http.Request) (any, error) {
+	h := New(Config{Logger: log}).Wrap(func(_ http.ResponseWriter, r *http.Request) (any, error) {
 		id, ok := RequestIDFromContext(r.Context())
 		if !ok {
 			t.Fatal("request ID missing from context")
@@ -93,8 +95,8 @@ func TestRequestIDGeneratedWhenAbsent(t *testing.T) {
 }
 
 func TestRequestIDPropagatedFromHeader(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
+	log, _ := captureLogs(t)
+	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
 		return nil, nil
 	}, RouteConfig{})
 
@@ -108,9 +110,9 @@ func TestRequestIDPropagatedFromHeader(t *testing.T) {
 }
 
 func TestErrorStatusAndErrorCodeHeader(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
-		return nil, standarderror.New(standarderror.Params{
+	log, _ := captureLogs(t)
+	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
+		return nil, stderr.New(nil, stderr.Options{
 			Message: "user not found",
 			Code:    "USER_NOT_FOUND",
 			Status:  http.StatusNotFound,
@@ -135,8 +137,8 @@ func TestErrorStatusAndErrorCodeHeader(t *testing.T) {
 }
 
 func TestPlainErrorDefaultsToInternalServerError(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
+	log, _ := captureLogs(t)
+	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
 		return nil, errors.New("boom")
 	}, RouteConfig{})
 
@@ -160,9 +162,9 @@ func TestPlainErrorDefaultsToInternalServerError(t *testing.T) {
 }
 
 func TestErrorIsLogged(t *testing.T) {
-	buf := captureLogs(t)
-	h := New(Config{}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
-		return nil, standarderror.New(standarderror.Params{
+	log, buf := captureLogs(t)
+	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
+		return nil, stderr.New(nil, stderr.Options{
 			Message: "kaboom",
 			Code:    "X",
 			Status:  http.StatusBadGateway,
@@ -183,8 +185,8 @@ func TestErrorIsLogged(t *testing.T) {
 }
 
 func TestPanicRecovered(t *testing.T) {
-	buf := captureLogs(t)
-	h := New(Config{}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
+	log, buf := captureLogs(t)
+	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
 		panic("unexpected")
 	}, RouteConfig{})
 
@@ -215,8 +217,8 @@ func TestPanicRecovered(t *testing.T) {
 }
 
 func TestRouteSuccessMessageOverride(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{}).Wrap(
+	log, _ := captureLogs(t)
+	h := New(Config{Logger: log}).Wrap(
 		func(http.ResponseWriter, *http.Request) (any, error) {
 			return nil, nil
 		},
@@ -231,9 +233,9 @@ func TestRouteSuccessMessageOverride(t *testing.T) {
 }
 
 func TestRouteMessageOverridesGlobalDefault(t *testing.T) {
-	captureLogs(t)
+	log, _ := captureLogs(t)
 	// Global default success message is "global"; the route overrides it.
-	wp := New(Config{SuccessMessage: "global"})
+	wp := New(Config{SuccessMessage: "global", Logger: log})
 	noop := func(http.ResponseWriter, *http.Request) (any, error) { return nil, nil }
 
 	overridden := wp.Wrap(noop, RouteConfig{SuccessMessage: "route"})
@@ -258,8 +260,8 @@ func TestContextCarriesRequestID(t *testing.T) {
 }
 
 func TestCustomRequestIDHeader(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{RequestIDHeader: "X-Trace-Id"}).Wrap(
+	log, _ := captureLogs(t)
+	h := New(Config{RequestIDHeader: "X-Trace-Id", Logger: log}).Wrap(
 		func(_ http.ResponseWriter, r *http.Request) (any, error) {
 			if id, ok := RequestIDFromContext(r.Context()); !ok || id != "trace-9" {
 				t.Fatalf("context request id = %q (%v), want %q", id, ok, "trace-9")
@@ -283,10 +285,10 @@ func TestCustomRequestIDHeader(t *testing.T) {
 }
 
 func TestCustomErrorCodeHeader(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{ErrorCodeHeader: "X-App-Error"}).Wrap(
+	log, _ := captureLogs(t)
+	h := New(Config{ErrorCodeHeader: "X-App-Error", Logger: log}).Wrap(
 		func(http.ResponseWriter, *http.Request) (any, error) {
-			return nil, standarderror.New(standarderror.Params{
+			return nil, stderr.New(nil, stderr.Options{
 				Message: "nope",
 				Code:    "E_NOPE",
 				Status:  http.StatusBadRequest,
@@ -318,8 +320,8 @@ func readBodyHandler() HandlerFunc {
 }
 
 func TestBodyCapRejectsOversizedBody(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{MaxBodyBytes: 8}).Wrap(readBodyHandler(), RouteConfig{})
+	log, _ := captureLogs(t)
+	h := New(Config{MaxBodyBytes: 8, Logger: log}).Wrap(readBodyHandler(), RouteConfig{})
 
 	body := strings.NewReader(strings.Repeat("a", 64))
 	rec := do(h, httptest.NewRequest(http.MethodPost, "/", body))
@@ -332,8 +334,8 @@ func TestBodyCapRejectsOversizedBody(t *testing.T) {
 }
 
 func TestBodyCapAllowsBodyWithinLimit(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{MaxBodyBytes: 64}).Wrap(readBodyHandler(), RouteConfig{})
+	log, _ := captureLogs(t)
+	h := New(Config{MaxBodyBytes: 64, Logger: log}).Wrap(readBodyHandler(), RouteConfig{})
 
 	rec := do(h, httptest.NewRequest(http.MethodPost, "/", strings.NewReader("hello")))
 
@@ -347,9 +349,9 @@ func TestBodyCapAllowsBodyWithinLimit(t *testing.T) {
 }
 
 func TestBodyCapDefaultApplied(t *testing.T) {
-	captureLogs(t)
+	log, _ := captureLogs(t)
 	// Config{} resolves MaxBodyBytes to DefaultMaxBodyBytes.
-	h := New(Config{}).Wrap(readBodyHandler(), RouteConfig{})
+	h := New(Config{Logger: log}).Wrap(readBodyHandler(), RouteConfig{})
 
 	big := strings.NewReader(strings.Repeat("a", int(DefaultMaxBodyBytes)+1))
 	rec := do(h, httptest.NewRequest(http.MethodPost, "/", big))
@@ -360,8 +362,8 @@ func TestBodyCapDefaultApplied(t *testing.T) {
 }
 
 func TestBodyCapDisabledByNegative(t *testing.T) {
-	captureLogs(t)
-	h := New(Config{MaxBodyBytes: -1}).Wrap(readBodyHandler(), RouteConfig{})
+	log, _ := captureLogs(t)
+	h := New(Config{MaxBodyBytes: -1, Logger: log}).Wrap(readBodyHandler(), RouteConfig{})
 
 	big := strings.Repeat("a", int(DefaultMaxBodyBytes)+1)
 	rec := do(h, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(big)))

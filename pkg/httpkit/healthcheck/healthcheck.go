@@ -36,6 +36,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"gorontalo/pkg/stderr"
 )
 
 // Default paths served by a Handler, overridable with Config.HealthPath,
@@ -92,7 +94,11 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 	case "unavailable":
 		*s = StatusUnavailable
 	default:
-		return fmt.Errorf("healthcheck: unknown status %q", label)
+		return stderr.New(nil, stderr.Options{
+			Message: fmt.Sprintf("healthcheck: unknown status %q", label),
+			Code:    "INVALID_STATUS",
+			Status:  http.StatusBadRequest,
+		})
 	}
 	return nil
 }

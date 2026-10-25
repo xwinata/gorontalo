@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,27 +60,29 @@ func TestFileWriter_CloseFlushes(t *testing.T) {
 	}
 }
 
-func TestBuildState_FileWriterIntegration(t *testing.T) {
+func TestBuildLogger_FileWriterIntegration(t *testing.T) {
 	dir := t.TempDir()
-	if err := Init(Config{
+	log, err := New(Config{
 		Level:            LevelInfo,
 		Writers:          []Writer{WriterFile},
 		FileDir:          dir,
-		FilePrefix:       "goliath",
+		FilePrefix:       "myapp",
 		FileBufferKB:     1,
 		FileFlushSeconds: 3600,
 		Format:           FormatJSON,
-	}); err != nil {
-		t.Fatalf("Init: %v", err)
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
 	}
+	defer log.Close()
 
-	Info("persisted", F("id", 1))
-	if err := Sync(); err != nil {
+	log.Info(context.Background(), "persisted", Attr{Key: "id", Value: 1})
+	if err := log.Sync(); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
 
 	suffix := time.Now().Format(time.DateOnly)
-	data, err := os.ReadFile(filepath.Join(dir, "goliath-"+suffix+".log"))
+	data, err := os.ReadFile(filepath.Join(dir, "myapp-"+suffix+".log"))
 	if err != nil {
 		t.Fatalf("read log: %v", err)
 	}

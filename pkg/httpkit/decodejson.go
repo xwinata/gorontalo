@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"goliath/pkg/httpkit/stdwrapper"
-	"goliath/pkg/standarderror"
+	"gorontalo/pkg/httpkit/stdwrapper"
+	"gorontalo/pkg/stderr"
 )
 
 // DecodeJSON reads r's body and decodes it into a value of type T. It is the
@@ -24,7 +24,7 @@ import (
 //
 // Decoding is strict: unknown fields are rejected and the body must contain
 // exactly one JSON value with no trailing data. On any failure DecodeJSON
-// returns the zero value of T and a *standarderror.Error with HTTP status 400
+// returns the zero value of T and a *stderr.StdErr with HTTP status 400
 // and no application error code, so a handler can return it directly for a 400
 // or re-wrap it to attach a code of its own.
 //
@@ -61,7 +61,7 @@ func defaultLimitFor(r *http.Request) int64 {
 // DecodeJSONMax is DecodeJSON with an explicit body size limit in bytes. A
 // maxBytes of zero or less disables the limit, decoding the body unbounded;
 // only do that for trusted input. All other behavior — strict decoding and the
-// 400 *standarderror.Error on failure — matches DecodeJSON.
+// 400 *stderr.StdErr on failure — matches DecodeJSON.
 func DecodeJSONMax[T any](r *http.Request, maxBytes int64) (T, error) {
 	out, err := decodeRequest[T](r, maxBytes)
 	return out, decodeError(err)
@@ -74,7 +74,7 @@ func DecodeJSONMax[T any](r *http.Request, maxBytes int64) (T, error) {
 //
 // It applies the same strict rules as DecodeJSON — unknown fields rejected,
 // exactly one value, no trailing data — and returns the same
-// *standarderror.Error (HTTP 400, no application code) on failure. A nil body
+// *stderr.StdErr (HTTP 400, no application code) on failure. A nil body
 // is reported as a bad-request error rather than panicking.
 func DecodeJSONReader[T any](body io.Reader) (T, error) {
 	if body == nil {
@@ -121,10 +121,10 @@ func decode[T any](body io.Reader) (T, error) {
 
 // decodeError wraps a non-nil err as a 400 bad-request standard error, and
 // returns nil unchanged. It sets no application error code, leaving that to the
-// caller, which can re-wrap the returned error (standarderror inherits the
+// caller, which can re-wrap the returned error (stderr inherits the
 // empty code) to classify the failure for its own clients.
 //
-// It is called directly from each exported entry point so the standarderror
+// It is called directly from each exported entry point so the stderr
 // stack trace, captured at New, is a fixed two frames below the entry point
 // (decodeError, then the entry point), making SkipFrames constant regardless of
 // which entry point or internal helper produced err.
@@ -132,8 +132,7 @@ func decodeError(err error) error {
 	if err == nil {
 		return nil
 	}
-	return standarderror.New(standarderror.Params{
-		Err:     err,
+	return stderr.New(err, stderr.Options{
 		Message: "decode JSON body",
 		Status:  http.StatusBadRequest,
 		// Skip decodeError and the exported entry point so the trace starts at

@@ -3,18 +3,18 @@
 # stdwrapper
 
 ```go
-import "goliath/pkg/httpkit/stdwrapper"
+import "gorontalo/pkg/httpkit/stdwrapper"
 ```
 
-Package stdwrapper adapts application handlers to a standard HTTP contract. It wraps a handler that returns a value and an error, reads standard request headers, writes a standard JSON response envelope, logs failures, and recovers from panics. It depends only on the standard library plus the in\-repo goliath/pkg/logger, goliath/pkg/tracer, and goliath/pkg/standarderror packages.
+Package stdwrapper adapts application handlers to a standard HTTP contract. It wraps a handler that returns a value and an error, reads standard request headers, writes a standard JSON response envelope, logs failures, and recovers from panics. It depends only on the standard library plus the in\-repo gorontalo/pkg/logger, gorontalo/pkg/tracer, and gorontalo/pkg/stderr packages.
 
 A wrapped handler has the signature HandlerFunc: it returns the data to send on success and an error on failure, instead of writing to the http.ResponseWriter itself. Build a Wrapper once with New, passing the service\-wide Config, then call its Wrap method for each route. The wrapper turns a HandlerFunc into an \*http.Handler and takes care of the cross\-cutting concerns:
 
 - Request ID: it reads the request\-ID header \(HeaderRequestID by default, overridable with Config.RequestIDHeader\), generating a random one when absent, stores it on the request context \(retrievable with RequestIDFromContext\), and echoes it back on the same response header.
 - Response envelope: successful responses carry \{"data": ..., "message": ...\}; failed responses carry \{"message": ...\} with the error message. The envelope never includes the application error code.
-- Error code: the application\-level error code \(from goliath/pkg/standarderror\) is sent on the error\-code response header \(HeaderErrorCode by default, overridable with Config.ErrorCodeHeader\), separate from the HTTP status.
-- Status mapping: the HTTP status comes from the error's Status when set \(see goliath/pkg/standarderror\), falling back to 500 for errors and 200 for success.
-- Logging: failures and recovered panics are logged with goliath/pkg/logger at error level, including the request ID and \(for standard errors\) the captured stack trace.
+- Error code: the application\-level error code \(from gorontalo/pkg/stderr\) is sent on the error\-code response header \(HeaderErrorCode by default, overridable with Config.ErrorCodeHeader\), separate from the HTTP status.
+- Status mapping: the HTTP status comes from the error's Status when set \(see gorontalo/pkg/stderr\), falling back to 500 for errors and 200 for success.
+- Logging: when a \[logger.Logger\] is supplied via Config.Logger, failures and recovered panics are logged at error level, including the request ID and \(for standard errors\) the captured stack trace. With no logger configured, request handling is unchanged but nothing is logged.
 - Panic recovery: a panic in the handler is recovered, logged, and turned into a 500 response so the server stays up.
 - Body limit: the request body is capped with http.MaxBytesReader \(DefaultMaxBodyBytes by default, overridable with Config.MaxBodyBytes, or disabled with a negative value\) before the handler runs, so any body read is bounded against unbounded client input.
 
@@ -33,8 +33,7 @@ mux.Handle("GET /users/{id}", std.Wrap(
     func(w http.ResponseWriter, r *http.Request) (any, error) {
         u, err := store.Load(r.Context(), r.PathValue("id"))
         if err != nil {
-            return nil, standarderror.New(standarderror.Params{
-                Err:     err,
+            return nil, stderr.New(err, stderr.Options{
                 Message: "user not found",
                 Code:    "USER_NOT_FOUND",
                 Status:  http.StatusNotFound,
@@ -100,7 +99,7 @@ func RequestIDFromContext(ctx context.Context) (string, bool)
 RequestIDFromContext returns the request ID stored on ctx by the wrapper, and reports whether one was present. Handlers invoked through Wrap can use it to include the request ID in their own logs or downstream calls.
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/options.go#L11-L37>)
+## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/options.go#L13-L44>)
 
 Config holds the service\-wide settings shared by every handler a Wrapper produces. Create a Wrapper once with New\(Config\{...\}\) and reuse it across routes; per\-route overrides go in RouteConfig passed to Wrap.
 
@@ -133,6 +132,11 @@ type Config struct {
     // when the error carries no client-facing message of its own. Empty selects
     // defaultErrorMessage. A route may override it with RouteConfig.ErrorMessage.
     ErrorMessage string
+
+    // Logger receives error-level logs for failed and panicking requests. It is
+    // an injected dependency: there is no package-level default. When nil, the
+    // wrapper runs without logging (request handling is otherwise unchanged).
+    Logger *logger.Logger
 }
 ```
 
@@ -146,7 +150,7 @@ type HandlerFunc func(w http.ResponseWriter, r *http.Request) (data any, err err
 ```
 
 <a name="RouteConfig"></a>
-## type [RouteConfig](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/options.go#L42-L50>)
+## type [RouteConfig](<https://github.com/xwinata/goliath/blob/main/pkg/httpkit/stdwrapper/options.go#L49-L57>)
 
 RouteConfig holds per\-route overrides applied on top of a Wrapper's global Config. The zero value is valid and changes nothing: every empty field inherits the Wrapper's corresponding Config value.
 

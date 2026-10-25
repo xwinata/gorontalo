@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"goliath/pkg/httpkit/stdwrapper"
-	"goliath/pkg/standarderror"
+	"gorontalo/pkg/httpkit/stdwrapper"
+	"gorontalo/pkg/stderr"
 )
 
 type createUser struct {
@@ -104,7 +104,7 @@ func TestDecodeJSONErrorTracePointsAtCaller(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	frames := standarderror.StackTrace(err)
+	frames := stderr.StackTrace(err)
 	if len(frames) == 0 {
 		t.Fatal("expected a captured stack trace")
 	}
@@ -167,10 +167,10 @@ func assertDecodeError(t *testing.T, err error) {
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	if code := standarderror.Code(err); code != "" {
+	if code := stderr.Code(err); code != "" {
 		t.Fatalf("error code = %q, want empty (caller's choice)", code)
 	}
-	if status := standarderror.Status(err); status != http.StatusBadRequest {
+	if status := stderr.Status(err); status != http.StatusBadRequest {
 		t.Fatalf("error status = %d, want %d", status, http.StatusBadRequest)
 	}
 }

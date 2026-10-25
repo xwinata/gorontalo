@@ -3,7 +3,7 @@
 # tools
 
 ```go
-import "goliath/tools"
+import "gorontalo/tools"
 ```
 
 Package tools centralizes build\-time tooling for this module.

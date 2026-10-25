@@ -3,7 +3,7 @@
 # tracer
 
 ```go
-import "goliath/pkg/tracer"
+import "gorontalo/pkg/tracer"
 ```
 
 Package tracer captures runtime call\-stack information for debugging and error diagnostics.

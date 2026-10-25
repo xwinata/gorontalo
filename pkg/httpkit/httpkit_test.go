@@ -3,7 +3,7 @@ package httpkit
 import (
 	"testing"
 
-	"goliath/pkg/httpkit/stdwrapper"
+	"gorontalo/pkg/httpkit/stdwrapper"
 )
 
 func TestHeadersMirrorStdwrapper(t *testing.T) {

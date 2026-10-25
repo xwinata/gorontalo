@@ -1,4 +1,4 @@
-package standarderror
+package stderr
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 
 func TestNewWrapsCauseAndMessage(t *testing.T) {
 	cause := errors.New("boom")
-	err := New(Params{Err: cause, Message: "load failed"})
+	err := New(cause, Options{Message: "load failed"})
 
 	if got, want := err.Error(), "load failed: boom"; got != want {
 		t.Fatalf("Error() = %q, want %q", got, want)
@@ -20,7 +20,7 @@ func TestNewWrapsCauseAndMessage(t *testing.T) {
 }
 
 func TestNewNoCauseUsesMessageOnly(t *testing.T) {
-	err := New(Params{Message: "standalone"})
+	err := New(nil, Options{Message: "standalone"})
 	if got := err.Error(); got != "standalone" {
 		t.Fatalf("Error() = %q, want %q", got, "standalone")
 	}
@@ -31,14 +31,14 @@ func TestNewNoCauseUsesMessageOnly(t *testing.T) {
 
 func TestNewEmptyMessageWithCauseRendersCause(t *testing.T) {
 	cause := errors.New("boom")
-	err := New(Params{Err: cause})
+	err := New(cause, Options{})
 	if got := err.Error(); got != "boom" {
 		t.Fatalf("Error() = %q, want %q", got, "boom")
 	}
 }
 
 func TestCodeAndStatus(t *testing.T) {
-	err := New(Params{
+	err := New(nil, Options{
 		Message: "nope",
 		Code:    "USER_NOT_FOUND",
 		Status:  http.StatusNotFound,
@@ -52,19 +52,19 @@ func TestCodeAndStatus(t *testing.T) {
 }
 
 func TestInvalidStatusIgnored(t *testing.T) {
-	err := New(Params{Message: "x", Status: 42})
+	err := New(nil, Options{Message: "x", Status: 42})
 	if got := err.Status(); got != 0 {
 		t.Fatalf("Status() = %d, want 0 for out-of-range input", got)
 	}
 }
 
 func TestCodeAndStatusInheritedFromCause(t *testing.T) {
-	inner := New(Params{
+	inner := New(nil, Options{
 		Message: "inner",
 		Code:    "INNER",
 		Status:  http.StatusBadRequest,
 	})
-	outer := New(Params{Err: inner, Message: "outer"})
+	outer := New(inner, Options{Message: "outer"})
 
 	if got := outer.Code(); got != "INNER" {
 		t.Fatalf("Code() = %q, want inherited %q", got, "INNER")
@@ -75,8 +75,8 @@ func TestCodeAndStatusInheritedFromCause(t *testing.T) {
 }
 
 func TestOuterCodeAndStatusWin(t *testing.T) {
-	inner := New(Params{Message: "inner", Code: "INNER", Status: 400})
-	outer := New(Params{Err: inner, Message: "outer", Code: "OUTER", Status: 409})
+	inner := New(nil, Options{Message: "inner", Code: "INNER", Status: 400})
+	outer := New(inner, Options{Message: "outer", Code: "OUTER", Status: 409})
 
 	if got := outer.Code(); got != "OUTER" {
 		t.Fatalf("Code() = %q, want %q", got, "OUTER")
@@ -87,9 +87,9 @@ func TestOuterCodeAndStatusWin(t *testing.T) {
 }
 
 func TestMessageInheritedFromCause(t *testing.T) {
-	inner := New(Params{Message: "load user", Code: "USER_NOT_FOUND", Status: 404})
+	inner := New(nil, Options{Message: "load user", Code: "USER_NOT_FOUND", Status: 404})
 	// Outer sets only a code; message and status should be inherited.
-	outer := New(Params{Err: inner, Code: "OVERRIDE"})
+	outer := New(inner, Options{Code: "OVERRIDE"})
 
 	if got := outer.Error(); got != "load user" {
 		t.Fatalf("Error() = %q, want inherited message %q without duplication", got, "load user")
@@ -106,8 +106,8 @@ func TestInheritedFieldsAreStoredOnNewError(t *testing.T) {
 	// Inheritance happens at construction, so a re-wrapped error carries the
 	// values on its own fields even if the chain below it is later inspected
 	// only through this error.
-	inner := New(Params{Message: "inner msg", Code: "INNER", Status: 500})
-	outer := New(Params{Err: inner, Message: "outer msg"})
+	inner := New(nil, Options{Message: "inner msg", Code: "INNER", Status: 500})
+	outer := New(inner, Options{Message: "outer msg"})
 
 	if got := outer.Code(); got != "INNER" {
 		t.Fatalf("Code() = %q, want inherited %q", got, "INNER")
@@ -123,7 +123,7 @@ func TestInheritedFieldsAreStoredOnNewError(t *testing.T) {
 func TestInheritanceSkipsNonStandardCause(t *testing.T) {
 	// A plain cause carries no code/status/message to inherit, so empty fields
 	// stay empty.
-	err := New(Params{Err: errors.New("boom")})
+	err := New(errors.New("boom"), Options{})
 	if got := err.Code(); got != "" {
 		t.Fatalf("Code() = %q, want empty", got)
 	}
@@ -136,11 +136,11 @@ func TestInheritanceSkipsNonStandardCause(t *testing.T) {
 }
 
 func TestInheritanceAcrossPlainErrorInChain(t *testing.T) {
-	// standarderror -> plain error -> standarderror. errors.As finds the
-	// nearest *Error below, so inheritance reaches through the plain wrapper.
-	base := New(Params{Message: "base", Code: "BASE", Status: 403})
+	// stderr -> plain error -> stderr. errors.As finds the
+	// nearest *StdErr below, so inheritance reaches through the plain wrapper.
+	base := New(nil, Options{Message: "base", Code: "BASE", Status: 403})
 	plain := errWrap{msg: "mid", err: base}
-	outer := New(Params{Err: plain, Message: "outer"})
+	outer := New(plain, Options{Message: "outer"})
 
 	if got := outer.Code(); got != "BASE" {
 		t.Fatalf("Code() = %q, want inherited %q", got, "BASE")
@@ -151,7 +151,7 @@ func TestInheritanceAcrossPlainErrorInChain(t *testing.T) {
 }
 
 // errWrap is a minimal error that wraps another error, used to test
-// inheritance reaching through a non-*Error link in the chain.
+// inheritance reaching through a non-*StdErr link in the chain.
 type errWrap struct {
 	msg string
 	err error
@@ -161,7 +161,7 @@ func (e errWrap) Error() string { return e.msg + ": " + e.err.Error() }
 func (e errWrap) Unwrap() error { return e.err }
 
 func TestStackTraceCaptured(t *testing.T) {
-	err := New(Params{Message: "trace me"})
+	err := New(nil, Options{Message: "trace me"})
 	frames := err.StackTrace()
 	if len(frames) == 0 {
 		t.Fatal("expected at least one captured frame")
@@ -173,10 +173,10 @@ func TestStackTraceCaptured(t *testing.T) {
 }
 
 func TestStackTraceReusedFromCause(t *testing.T) {
-	inner := New(Params{Message: "inner"})
+	inner := New(nil, Options{Message: "inner"})
 	innerTop := inner.StackTrace()[0]
 
-	outer := New(Params{Err: inner, Message: "outer"})
+	outer := New(inner, Options{Message: "outer"})
 	outerTop := outer.StackTrace()[0]
 
 	if innerTop != outerTop {
@@ -190,7 +190,7 @@ func TestPackageHelpers(t *testing.T) {
 		t.Fatal("helpers should return zero values for a non-standard error")
 	}
 
-	err := New(Params{Err: plain, Message: "wrapped", Code: "C", Status: 503})
+	err := New(plain, Options{Message: "wrapped", Code: "C", Status: 503})
 	if Code(err) != "C" {
 		t.Fatalf("Code() = %q, want %q", Code(err), "C")
 	}
@@ -203,10 +203,10 @@ func TestPackageHelpers(t *testing.T) {
 }
 
 func TestErrorsAsFindsStandardError(t *testing.T) {
-	err := New(Params{Err: errors.New("x"), Message: "y", Code: "Z"})
-	var se *Error
+	err := New(errors.New("x"), Options{Message: "y", Code: "Z"})
+	var se *StdErr
 	if !errors.As(err, &se) {
-		t.Fatal("errors.As should find *Error")
+		t.Fatal("errors.As should find *StdErr")
 	}
 	if se.Code() != "Z" {
 		t.Fatalf("Code() = %q, want %q", se.Code(), "Z")

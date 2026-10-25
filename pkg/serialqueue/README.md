@@ -3,7 +3,7 @@
 # serialqueue
 
 ```go
-import "goliath/pkg/serialqueue"
+import "gorontalo/pkg/serialqueue"
 ```
 
 Package serialqueue runs jobs one at a time in submission order.

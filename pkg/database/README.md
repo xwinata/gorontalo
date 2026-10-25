@@ -3,7 +3,7 @@
 # database
 
 ```go
-import "goliath/pkg/database"
+import "gorontalo/pkg/database"
 ```
 
 ## Index
@@ -16,7 +16,7 @@ import "goliath/pkg/database"
 
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/database/database.go#L11-L32>)
+## type [Config](<https://github.com/xwinata/goliath/blob/main/pkg/database/database.go#L14-L35>)
 
 Config holds the settings required to connect to a database.
 
@@ -64,7 +64,7 @@ type Database interface {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/goliath/blob/main/pkg/database/database.go#L50>)
+### func [New](<https://github.com/xwinata/goliath/blob/main/pkg/database/database.go#L53>)
 
 ```go
 func New(cfg Config) Database

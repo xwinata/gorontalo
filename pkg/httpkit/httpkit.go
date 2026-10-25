@@ -7,13 +7,13 @@
 // Each handler is its own package; import the one you need directly. This
 // package does not re-export them, so the import path is the discovery path:
 //
-//   - goliath/pkg/httpkit/healthcheck — health, liveness, and readiness
+//   - gorontalo/pkg/httpkit/healthcheck — health, liveness, and readiness
 //     endpoints for orchestrators such as Kubernetes.
-//   - goliath/pkg/httpkit/stdwrapper — adapts application handlers to a
+//   - gorontalo/pkg/httpkit/stdwrapper — adapts application handlers to a
 //     standard request/response contract (request ID, response envelope,
 //     error-code header, logging, panic recovery).
 //
-// New presets are added as sibling sub-packages under goliath/pkg/httpkit and
+// New presets are added as sibling sub-packages under gorontalo/pkg/httpkit and
 // listed here, so this comment stays the index of what the kit offers.
 //
 // # Shared contracts
@@ -34,7 +34,7 @@
 //	body, err := httpkit.DecodeJSON[CreateUser](r)
 package httpkit
 
-import "goliath/pkg/httpkit/stdwrapper"
+import "gorontalo/pkg/httpkit/stdwrapper"
 
 // headerNames groups the standard HTTP header names used across httpkit. The
 // single exported value Headers is the instance callers reference; the type is
