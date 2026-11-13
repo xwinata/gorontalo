@@ -3,7 +3,7 @@
 # healthcheck
 
 ```go
-import "gorontalo/pkg/httpkit/healthcheck"
+import "github.com/xwinata/gorontalo/pkg/httpkit/healthcheck"
 ```
 
 Package healthcheck registers a small set of common HTTP endpoints on a standard library \*http.ServeMux. It has no third\-party dependencies.
@@ -87,7 +87,7 @@ type Config struct {
 ```
 
 <a name="Handler"></a>
-## type [Handler](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L115-L121>)
+## type [Handler](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L117-L123>)
 
 Handler serves the health, liveness, and readiness endpoints. Create one with New and wire it into a mux with Register.
 
@@ -98,7 +98,7 @@ type Handler struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L126>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L128>)
 
 ```go
 func New(cfg Config) *Handler
@@ -107,7 +107,7 @@ func New(cfg Config) *Handler
 New creates a Handler configured by cfg. A zero\-value Config serves the default paths with no readiness or liveness checks \(so both probes simply confirm the process is up\).
 
 <a name="Handler.Register"></a>
-### func \(\*Handler\) [Register](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L140>)
+### func \(\*Handler\) [Register](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/healthcheck/healthcheck.go#L142>)
 
 ```go
 func (h *Handler) Register(mux *http.ServeMux)

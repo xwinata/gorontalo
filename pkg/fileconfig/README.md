@@ -3,7 +3,7 @@
 # fileconfig
 
 ```go
-import "gorontalo/pkg/fileconfig"
+import "github.com/xwinata/gorontalo/pkg/fileconfig"
 ```
 
 Package fileconfig reads a single configuration file from disk and decodes it into a caller\-chosen type.
@@ -89,7 +89,7 @@ const (
 ```
 
 <a name="Config"></a>
-## type [Config](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/options.go#L12-L39>)
+## type [Config](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/options.go#L13-L40>)
 
 Config customizes a Loader created by New. Only Path is required; every other field has a usable zero value.
 
@@ -125,7 +125,7 @@ type Config[T any] struct {
 ```
 
 <a name="Loader"></a>
-## type [Loader](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L101-L107>)
+## type [Loader](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L102-L108>)
 
 Loader reads and decodes a configuration file into a \*T. It is safe for concurrent use. By default \(zero TTL, CachePermanently false\) every Load re\-reads the file; a positive Config.TTL caches a result for that duration, and Config.CachePermanently caches the first result forever. Create one with New.
 
@@ -136,7 +136,7 @@ type Loader[T any] struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L114>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L115>)
 
 ```go
 func New[T any](cfg Config[T]) (*Loader[T], error)
@@ -145,7 +145,7 @@ func New[T any](cfg Config[T]) (*Loader[T], error)
 New validates cfg and returns a Loader that decodes into T. It fails with a \*stderr.StdErr carrying CodeInvalidConfig when Path is empty. All other fields have valid zero values: a zero TTL with CachePermanently false disables caching, a nil Decoder selects JSON, and a nil Validate skips validation.
 
 <a name="Loader[T].Load"></a>
-### func \(\*Loader\[T\]\) [Load](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L136>)
+### func \(\*Loader\[T\]\) [Load](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L137>)
 
 ```go
 func (l *Loader[T]) Load(ctx context.Context) (*T, error)
@@ -158,7 +158,7 @@ Caching depends on Config: with the default \(zero TTL, CachePermanently false\)
 Each actual read is bounded by ctx. On any failure it returns a \*stderr.StdErr whose code identifies the stage that failed \(CodeReadFailed, CodeDecodeFailed, or CodeValidationFailed\); a failed Load leaves any existing cached value untouched.
 
 <a name="Loader[T].Path"></a>
-### func \(\*Loader\[T\]\) [Path](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L184>)
+### func \(\*Loader\[T\]\) [Path](<https://github.com/xwinata/gorontalo/blob/main/pkg/fileconfig/fileconfig.go#L189>)
 
 ```go
 func (l *Loader[T]) Path() string

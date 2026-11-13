@@ -1,6 +1,7 @@
 package fileconfig
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -54,20 +55,24 @@ type resolvedConfig[T any] struct {
 // with CodeInvalidConfig when Path is empty or cannot be resolved.
 func (c Config[T]) resolved() (resolvedConfig[T], error) {
 	if c.Path == "" {
-		return resolvedConfig[T]{}, stderr.New(nil, stderr.Options{
-			Message: "fileconfig: Config.Path is required",
-			Code:    CodeInvalidConfig,
-			Status:  http.StatusInternalServerError,
-		})
+		return resolvedConfig[T]{}, stderr.New(
+			"fileconfig: Config.Path is required",
+			stderr.WithOptions(stderr.Options{
+				Code:       CodeInvalidConfig,
+				HTTPStatus: http.StatusInternalServerError,
+			}),
+		)
 	}
 
 	path, err := resolvePath(c.Path)
 	if err != nil {
-		return resolvedConfig[T]{}, stderr.New(err, stderr.Options{
-			Message: "fileconfig: resolve path " + c.Path,
-			Code:    CodeInvalidConfig,
-			Status:  http.StatusInternalServerError,
-		})
+		return resolvedConfig[T]{}, stderr.Wrap(
+			fmt.Errorf("fileconfig: resolve path %s: %w", c.Path, err),
+			stderr.WithOptions(stderr.Options{
+				Code:       CodeInvalidConfig,
+				HTTPStatus: http.StatusInternalServerError,
+			}),
+		)
 	}
 
 	decode := c.Decoder

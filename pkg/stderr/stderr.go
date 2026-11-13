@@ -1,205 +1,169 @@
-// Package stderr wraps errors with a contextual message, a captured
-// stack trace, an application-level error code, and an HTTP status. It builds
-// on gorontalo/pkg/tracer for stack capture and has no third-party dependencies.
+// Package stderr provides errors that carry a captured stack trace, an
+// application-level error code, and an HTTP status. It builds on
+// gorontalo/pkg/tracer for stack capture and has no third-party dependencies.
 //
-// A standard error preserves the original error chain, so errors.Is and
-// errors.As keep working. The stack trace is captured once, at the point an
-// ordinary error is first wrapped; wrapping an already-wrapped error reuses the
-// original trace instead of capturing a new one.
+// There are three constructors:
+//
+//   - New(msg) creates an error with the given message and records the stack
+//     trace at the call site.
+//   - Wrap(err) records a stack trace on an existing error without changing
+//     its message.
+//   - Opaque(err, msg) reports only msg from Error() but keeps err reachable
+//     through errors.Is, errors.As, and Unwrap, so internal causes are not
+//     leaked in messages shown to clients.
+//
+// Messages are plain strings; format them with fmt.Sprintf, or with
+// fmt.Errorf and %w before passing the result to Wrap, as needed.
+//
+// A *StdErr preserves the original error chain, so errors.Is and errors.As
+// keep working. The stack trace is captured once, where an error first enters
+// this package; wrapping an error that already carries one reuses the original
+// trace instead of capturing a new one. By default only the call-site frame is
+// recorded; set Options.TraceDepth to capture more of the stack.
 //
 // The code and status travel with the error so transport layers can report
 // them without a separate lookup. The application error code is distinct from
 // the HTTP status: the code identifies the failure to the application and its
 // clients (e.g. "USER_NOT_FOUND"), while the status is the HTTP status an API
-// should return (e.g. 404). Use errors.As with *StdErr to read them back.
+// should return (e.g. 404). Both are looked up down the chain, so an outer
+// error that sets neither reports the nearest inner values.
 //
-// Construction uses a single New constructor that takes the cause to wrap as
-// its first argument and an Options struct as its second, so every call site
-// names the fields it sets and the zero value of Options yields sensible
-// defaults.
-//
-// When New wraps another *StdErr, any of Message, Code, and Status left empty on
-// Options is inherited from the nearest wrapped *StdErr that sets it. This
-// means re-wrapping only needs to set the fields that change: adding a message
-// leaves the original code and status in place.
+// Code, HTTP status, and trace settings are supplied through the Options
+// parameter struct, passed to any constructor as WithOptions(opts). The zero
+// value of Options is valid.
 //
 // # Usage
 //
-//	if err := db.Load(ctx, id); err != nil {
-//	    return stderr.New(err, stderr.Options{
-//	        Message: "load user",
-//	        Code:    "USER_NOT_FOUND",
-//	        Status:  http.StatusNotFound,
-//	    })
-//	}
+//	// A new error with a captured stack trace.
+//	return stderr.New("invalid state")
 //
-// To originate a new error chain rather than wrap an existing one, pass a nil
-// cause:
+//	// Attach a code and HTTP status.
+//	return stderr.Wrap(
+//	    fmt.Errorf("load user %d: %w", id, err),
+//	    stderr.WithOptions(stderr.Options{
+//	        Code:       "USER_NOT_FOUND",
+//	        HTTPStatus: http.StatusNotFound,
+//	    }),
+//	)
 //
-//	return stderr.New(nil, stderr.Options{Message: "invalid state"})
+//	// Record a stack trace only; the message is unchanged.
+//	return stderr.Wrap(err)
+//
+//	// Hide the cause from the message but keep it for errors.Is/As and logs.
+//	return stderr.Opaque(err, "internal error", stderr.WithOptions(
+//	    stderr.Options{HTTPStatus: http.StatusInternalServerError},
+//	))
 //
 // Reading the metadata back:
 //
 //	var se *stderr.StdErr
 //	if errors.As(err, &se) {
-//	    log.Println(se.Code(), se.Status(), se.StackTrace())
+//	    log.Println(se.Code(), se.HTTPStatus(), se.StackTrace())
 //	}
+//
+// Wrap and Opaque return a nil *StdErr when err is nil. Calling a method on a
+// nil *StdErr panics, so check the result before using it. Beware Go's
+// typed-nil rule: a nil *StdErr stored in an error interface is not equal to
+// nil. Check err before wrapping rather than returning stderr.Wrap(err)
+// unconditionally:
+//
+//	if err != nil {
+//	    return stderr.Wrap(err)
+//	}
+//	return nil
 package stderr
 
 import (
 	"errors"
-	"fmt"
-	"sync"
 
 	"github.com/xwinata/gorontalo/pkg/tracer"
 )
 
-const (
-	// defaultSkip makes the first captured frame the caller of New. The trace
-	// is taken inside tracer.Trace, called from a closure passed to
-	// sync.Once.Do, inside StdErr.StackTrace, inside New. tracer's own default
-	// already skips tracer.Trace and runtime.Callers; this value skips the
-	// remaining intermediate frames (closure, sync.Once.Do, StackTrace, New).
-	defaultSkip = 7
-
-	// defaultMaxDepth caps the number of frames captured by default.
-	defaultMaxDepth = 32
-)
-
-// Options configures a StdErr created by New. The zero value is valid: it
-// produces an error with no code, no status, and the default trace settings.
-// Only Message is normally required.
-type Options struct {
-	// Message is the contextual message for this error. When empty and the
-	// cause passed to New unwraps to another *StdErr, it is inherited from the
-	// nearest ancestor *StdErr that has one.
-	Message string
-
-	// Code is the application-level error code (e.g. "USER_NOT_FOUND"). Empty
-	// means no code is set at this level; when the cause unwraps to another *StdErr,
-	// an empty Code is inherited from the nearest ancestor *StdErr that sets one.
-	Code string
-
-	// Status is the HTTP status an API should return (e.g. 404). Values outside
-	// 100–599 are ignored, leaving no status set at this level; when the cause
-	// unwraps to another *StdErr, an unset Status is inherited from the nearest
-	// ancestor *StdErr that sets one.
-	Status int
-
-	// SkipFrames adds to the number of leading stack frames skipped when the
-	// trace is captured. Use it from helpers that call New so their own frames
-	// do not appear. Negative values are ignored.
-	SkipFrames int
-
-	// TraceDepth caps the number of stack frames captured. Values < 1 keep the
-	// default depth.
-	TraceDepth int
-}
-
 // StdErr is an error carrying a message, an optional cause, a captured stack
 // trace, an application-level error code, and an HTTP status. Create one with
-// New and inspect it with errors.As.
+// New, Wrap, or Opaque and inspect it with errors.As.
 type StdErr struct {
-	msg    string
-	cause  error
-	code   string
-	status int
+	msg        string
+	cause      error
+	opaque     bool
+	code       string
+	httpStatus int
 
-	once   sync.Once
 	traces []tracer.Frame
-
-	skip     int
-	maxDepth int
 }
 
-// New creates a *StdErr wrapping err. When err is nil the result originates a
-// new error chain; otherwise it wraps err, preserving the chain for errors.Is
-// and errors.As. The stack trace is captured at this call unless the wrapped
-// error already carries one, in which case it is reused.
-//
-// When err unwraps to another *StdErr, any of Message, Code, and Status left
-// empty on opts are inherited from the nearest ancestor *StdErr that sets them.
-// This lets a caller re-wrap a standard error to add context to one field (say,
-// a message) while the code and status flow up unchanged.
-func New(err error, opts Options) *StdErr {
-	skip := defaultSkip
-	if opts.SkipFrames > 0 {
-		skip += opts.SkipFrames
-	}
-	maxDepth := defaultMaxDepth
-	if opts.TraceDepth >= 1 {
-		maxDepth = opts.TraceDepth
-	}
+// New returns a *StdErr with the given message and a stack trace captured at
+// this call. The message is used verbatim: compose it with fmt.Sprintf first
+// if it needs formatting. The result unwraps to errors.New(msg). To attach a
+// cause, use Wrap or Opaque. Pass
+// WithOptions to set a code, HTTP status, or trace settings.
+func New(msg string, opts ...Option) *StdErr {
+	return build(opts, msg, nil, false)
+}
 
-	status := 0
-	if opts.Status >= 100 && opts.Status <= 599 {
-		status = opts.Status
+// Wrap returns err annotated with a stack trace, leaving its message
+// unchanged. It returns a nil *StdErr when err is nil. If err already carries a stack
+// trace, that trace is reused. To add context to the message, wrap it first
+// with fmt.Errorf and %w.
+func Wrap(err error, opts ...Option) *StdErr {
+	if err == nil {
+		return nil
 	}
+	return build(opts, "", err, false)
+}
 
-	msg := opts.Message
-	code := opts.Code
-
-	// Inherit empty fields from the nearest wrapped *StdErr so re-wrapping only
-	// needs to set the fields that change.
-	var parent *StdErr
-	if errors.As(err, &parent) {
-		if msg == "" {
-			msg = parent.messageValue()
-		}
-		if code == "" {
-			code = parent.Code()
-		}
-		if status == 0 {
-			status = parent.Status()
-		}
+// Opaque returns an error whose Error() is msg alone, hiding err's message,
+// while err stays reachable through Unwrap, errors.Is, and errors.As and its
+// stack trace, code, and status are recorded. It returns a nil *StdErr when
+// err is nil.
+func Opaque(err error, msg string, opts ...Option) *StdErr {
+	if err == nil {
+		return nil
 	}
+	return build(opts, msg, err, true)
+}
 
+// build assembles a StdErr. It is called directly by every exported
+// constructor so the trace skip depth (buildDepth) is constant.
+func build(opts []Option, msg string, cause error, opaque bool) *StdErr {
+	rc := resolve(opts)
+	// An error made by New has no cause of its own; give it a plain root so
+	// every *StdErr unwraps to the error it annotates.
+	if cause == nil {
+		cause = errors.New(msg)
+	}
 	e := &StdErr{
-		msg:      msg,
-		cause:    err,
-		code:     code,
-		status:   status,
-		skip:     skip,
-		maxDepth: maxDepth,
+		msg:        msg,
+		cause:      cause,
+		opaque:     opaque,
+		code:       rc.code,
+		httpStatus: rc.httpStatus,
 	}
-	// Capture the trace now (or inherit the cause's) so it reflects the call
-	// site rather than wherever StackTrace is first read.
-	e.StackTrace()
+	// Reuse the nearest wrapped trace so it points at the origin; otherwise
+	// capture one here, so it reflects the call site.
+	var parent *StdErr
+	if errors.As(cause, &parent) {
+		e.traces = parent.traces
+	} else {
+		e.traces = tracer.Trace(tracer.Config{
+			Skip:     rc.skip,
+			MaxDepth: rc.maxDepth,
+		})
+	}
 	return e
 }
 
-// messageValue returns the message carried by this error, or, when this error
-// has none of its own, the nearest ancestor *StdErr's message. It is used when
-// inheriting a message into a newly wrapped error and never walks into
-// non-*StdErr causes, so it reflects only messages set through this package.
-func (e *StdErr) messageValue() string {
-	if e.msg != "" {
+// Error implements the error interface. For an opaque error it is the message
+// alone; otherwise it is the cause's message.
+func (e *StdErr) Error() string {
+	if e.opaque {
 		return e.msg
 	}
-	var next *StdErr
-	if errors.As(e.cause, &next) {
-		return next.messageValue()
-	}
-	return ""
-}
-
-// Error implements the error interface. It renders the message followed by the
-// cause, if any, so the chain reads from outermost to innermost. When the
-// message was inherited from the cause (so it already equals the cause's
-// rendered form), it is not repeated.
-func (e *StdErr) Error() string {
-	if e.cause != nil {
-		causeMsg := e.cause.Error()
-		if e.msg == "" || e.msg == causeMsg {
-			return causeMsg
-		}
-		return fmt.Sprintf("%s: %v", e.msg, causeMsg)
-	}
-	return e.msg
+	return e.cause.Error()
 }
 
 // Unwrap returns the wrapped cause, enabling errors.Is and errors.As to walk
-// the chain.
+// the chain. This holds for opaque errors too.
 func (e *StdErr) Unwrap() error {
 	return e.cause
 }
@@ -218,62 +182,52 @@ func (e *StdErr) Code() string {
 	return ""
 }
 
-// Status returns the HTTP status. When this error does not set one, Status
+// HTTPStatus returns the HTTP status. When this error does not set one, HTTPStatus
 // looks down the chain for the nearest *StdErr that does and returns its status;
 // it returns 0 when none is found.
-func (e *StdErr) Status() int {
-	if e.status != 0 {
-		return e.status
+func (e *StdErr) HTTPStatus() int {
+	if e.httpStatus != 0 {
+		return e.httpStatus
 	}
 	var next *StdErr
 	if errors.As(e.cause, &next) {
-		return next.Status()
+		return next.HTTPStatus()
 	}
 	return 0
 }
 
-// StackTrace returns the captured call stack. If this error wraps another
-// *StdErr, it returns that error's trace so the origin frames are preserved.
-// Otherwise it captures the trace on first call and caches it.
+// StackTrace returns the frames captured when the error (or the innermost
+// wrapped *StdErr) was created. By default this is only the call-site frame;
+// set Options.TraceDepth to capture more.
 func (e *StdErr) StackTrace() []tracer.Frame {
-	var next *StdErr
-	if errors.As(e.cause, &next) {
-		return next.StackTrace()
-	}
-	e.once.Do(func() {
-		e.traces = tracer.Trace(tracer.Config{
-			Skip:     e.skip,
-			MaxDepth: e.maxDepth,
-		})
-	})
 	return e.traces
 }
 
 // Code returns the application error code carried by the nearest *StdErr in
-// err's chain, or "" when none is present.
+// err's chain, or "" when none is present or it is a nil *StdErr.
 func Code(err error) string {
 	var e *StdErr
-	if errors.As(err, &e) {
+	if errors.As(err, &e) && e != nil {
 		return e.Code()
 	}
 	return ""
 }
 
-// Status returns the HTTP status carried by the nearest *StdErr in err's chain,
-// or 0 when none is present.
-func Status(err error) int {
+// HTTPStatus returns the HTTP status carried by the nearest *StdErr in err's chain,
+// or 0 when none is present or it is a nil *StdErr.
+func HTTPStatus(err error) int {
 	var e *StdErr
-	if errors.As(err, &e) {
-		return e.Status()
+	if errors.As(err, &e) && e != nil {
+		return e.HTTPStatus()
 	}
 	return 0
 }
 
 // StackTrace returns the stack trace carried by the nearest *StdErr in err's
-// chain, or nil when none is present.
+// chain, or nil when none is present or it is a nil *StdErr.
 func StackTrace(err error) []tracer.Frame {
 	var e *StdErr
-	if errors.As(err, &e) {
+	if errors.As(err, &e) && e != nil {
 		return e.StackTrace()
 	}
 	return nil

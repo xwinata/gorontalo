@@ -170,7 +170,7 @@ func assertDecodeError(t *testing.T, err error) {
 	if code := stderr.Code(err); code != "" {
 		t.Fatalf("error code = %q, want empty (caller's choice)", code)
 	}
-	if status := stderr.Status(err); status != http.StatusBadRequest {
+	if status := stderr.HTTPStatus(err); status != http.StatusBadRequest {
 		t.Fatalf("error status = %d, want %d", status, http.StatusBadRequest)
 	}
 }

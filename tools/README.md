@@ -3,7 +3,7 @@
 # tools
 
 ```go
-import "gorontalo/tools"
+import "github.com/xwinata/gorontalo/tools"
 ```
 
 Package tools centralizes build\-time tooling for this module.

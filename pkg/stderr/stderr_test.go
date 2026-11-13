@@ -2,213 +2,201 @@ package stderr
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
 )
 
-func TestNewWrapsCauseAndMessage(t *testing.T) {
-	cause := errors.New("boom")
-	err := New(cause, Options{Message: "load failed"})
-
-	if got, want := err.Error(), "load failed: boom"; got != want {
-		t.Fatalf("Error() = %q, want %q", got, want)
-	}
-	if !errors.Is(err, cause) {
-		t.Fatal("errors.Is should find the wrapped cause")
-	}
+// callerLine returns the line of its caller. Used on the same line as a
+// constructor call, it yields the line the trace should record.
+func callerLine() int {
+	_, _, line, _ := runtime.Caller(1)
+	return line
 }
 
-func TestNewNoCauseUsesMessageOnly(t *testing.T) {
-	err := New(nil, Options{Message: "standalone"})
-	if got := err.Error(); got != "standalone" {
-		t.Fatalf("Error() = %q, want %q", got, "standalone")
-	}
-	if err.Unwrap() != nil {
-		t.Fatal("Unwrap should be nil when there is no cause")
-	}
+// thisFile is the path of this test file, as recorded in trace frames.
+func thisFile(t *testing.T) string {
+	t.Helper()
+	_, file, _, _ := runtime.Caller(0)
+	return file
 }
 
-func TestNewEmptyMessageWithCauseRendersCause(t *testing.T) {
-	cause := errors.New("boom")
-	err := New(cause, Options{})
-	if got := err.Error(); got != "boom" {
-		t.Fatalf("Error() = %q, want %q", got, "boom")
-	}
-}
+// errWrap is a non-*StdErr error that wraps another, used to check that
+// metadata lookups reach through foreign links in the chain.
+type errWrap struct{ err error }
 
-func TestCodeAndStatus(t *testing.T) {
-	err := New(nil, Options{
-		Message: "nope",
-		Code:    "USER_NOT_FOUND",
-		Status:  http.StatusNotFound,
-	})
-	if got := err.Code(); got != "USER_NOT_FOUND" {
-		t.Fatalf("Code() = %q, want %q", got, "USER_NOT_FOUND")
-	}
-	if got := err.Status(); got != http.StatusNotFound {
-		t.Fatalf("Status() = %d, want %d", got, http.StatusNotFound)
-	}
-}
-
-func TestInvalidStatusIgnored(t *testing.T) {
-	err := New(nil, Options{Message: "x", Status: 42})
-	if got := err.Status(); got != 0 {
-		t.Fatalf("Status() = %d, want 0 for out-of-range input", got)
-	}
-}
-
-func TestCodeAndStatusInheritedFromCause(t *testing.T) {
-	inner := New(nil, Options{
-		Message: "inner",
-		Code:    "INNER",
-		Status:  http.StatusBadRequest,
-	})
-	outer := New(inner, Options{Message: "outer"})
-
-	if got := outer.Code(); got != "INNER" {
-		t.Fatalf("Code() = %q, want inherited %q", got, "INNER")
-	}
-	if got := outer.Status(); got != http.StatusBadRequest {
-		t.Fatalf("Status() = %d, want inherited %d", got, http.StatusBadRequest)
-	}
-}
-
-func TestOuterCodeAndStatusWin(t *testing.T) {
-	inner := New(nil, Options{Message: "inner", Code: "INNER", Status: 400})
-	outer := New(inner, Options{Message: "outer", Code: "OUTER", Status: 409})
-
-	if got := outer.Code(); got != "OUTER" {
-		t.Fatalf("Code() = %q, want %q", got, "OUTER")
-	}
-	if got := outer.Status(); got != 409 {
-		t.Fatalf("Status() = %d, want %d", got, 409)
-	}
-}
-
-func TestMessageInheritedFromCause(t *testing.T) {
-	inner := New(nil, Options{Message: "load user", Code: "USER_NOT_FOUND", Status: 404})
-	// Outer sets only a code; message and status should be inherited.
-	outer := New(inner, Options{Code: "OVERRIDE"})
-
-	if got := outer.Error(); got != "load user" {
-		t.Fatalf("Error() = %q, want inherited message %q without duplication", got, "load user")
-	}
-	if got := outer.Code(); got != "OVERRIDE" {
-		t.Fatalf("Code() = %q, want %q", got, "OVERRIDE")
-	}
-	if got := outer.Status(); got != 404 {
-		t.Fatalf("Status() = %d, want inherited %d", got, 404)
-	}
-}
-
-func TestInheritedFieldsAreStoredOnNewError(t *testing.T) {
-	// Inheritance happens at construction, so a re-wrapped error carries the
-	// values on its own fields even if the chain below it is later inspected
-	// only through this error.
-	inner := New(nil, Options{Message: "inner msg", Code: "INNER", Status: 500})
-	outer := New(inner, Options{Message: "outer msg"})
-
-	if got := outer.Code(); got != "INNER" {
-		t.Fatalf("Code() = %q, want inherited %q", got, "INNER")
-	}
-	if got := outer.Status(); got != 500 {
-		t.Fatalf("Status() = %d, want inherited %d", got, 500)
-	}
-	if got := outer.Error(); got != "outer msg: inner msg" {
-		t.Fatalf("Error() = %q, want %q", got, "outer msg: inner msg")
-	}
-}
-
-func TestInheritanceSkipsNonStandardCause(t *testing.T) {
-	// A plain cause carries no code/status/message to inherit, so empty fields
-	// stay empty.
-	err := New(errors.New("boom"), Options{})
-	if got := err.Code(); got != "" {
-		t.Fatalf("Code() = %q, want empty", got)
-	}
-	if got := err.Status(); got != 0 {
-		t.Fatalf("Status() = %d, want 0", got)
-	}
-	if got := err.Error(); got != "boom" {
-		t.Fatalf("Error() = %q, want %q", got, "boom")
-	}
-}
-
-func TestInheritanceAcrossPlainErrorInChain(t *testing.T) {
-	// stderr -> plain error -> stderr. errors.As finds the
-	// nearest *StdErr below, so inheritance reaches through the plain wrapper.
-	base := New(nil, Options{Message: "base", Code: "BASE", Status: 403})
-	plain := errWrap{msg: "mid", err: base}
-	outer := New(plain, Options{Message: "outer"})
-
-	if got := outer.Code(); got != "BASE" {
-		t.Fatalf("Code() = %q, want inherited %q", got, "BASE")
-	}
-	if got := outer.Status(); got != 403 {
-		t.Fatalf("Status() = %d, want inherited %d", got, 403)
-	}
-}
-
-// errWrap is a minimal error that wraps another error, used to test
-// inheritance reaching through a non-*StdErr link in the chain.
-type errWrap struct {
-	msg string
-	err error
-}
-
-func (e errWrap) Error() string { return e.msg + ": " + e.err.Error() }
+func (e errWrap) Error() string { return "mid: " + e.err.Error() }
 func (e errWrap) Unwrap() error { return e.err }
 
-func TestStackTraceCaptured(t *testing.T) {
-	err := New(nil, Options{Message: "trace me"})
-	frames := err.StackTrace()
-	if len(frames) == 0 {
-		t.Fatal("expected at least one captured frame")
+func TestConstructorsMessageAndChain(t *testing.T) {
+	cause := errors.New("secret cause")
+
+	tests := []struct {
+		name      string
+		err       error
+		wantMsg   string
+		wantCause error // checked with errors.Is when non-nil
+	}{
+		{"New is verbatim", New("100% done %w"), "100% done %w", nil},
+		{"Wrap keeps message", Wrap(cause), "secret cause", cause},
+		{"Wrap keeps fmt.Errorf chain", Wrap(fmt.Errorf("x: %w", cause)), "x: secret cause", cause},
+		{"Opaque hides cause", Opaque(cause, "internal error"), "internal error", cause},
 	}
-	// The first frame should be this test function, not an internal frame.
-	if !strings.Contains(frames[0].Function, "TestStackTraceCaptured") {
-		t.Fatalf("first frame = %q, want it to be the caller of New", frames[0].Function)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.err.Error(); got != tt.wantMsg {
+				t.Fatalf("Error() = %q, want %q", got, tt.wantMsg)
+			}
+			if tt.wantCause != nil && !errors.Is(tt.err, tt.wantCause) {
+				t.Fatal("errors.Is should find the cause")
+			}
+		})
+	}
+}
+
+func TestNewUnwrapsToPlainRoot(t *testing.T) {
+	root := New("boom").Unwrap()
+	if root == nil || root.Error() != "boom" {
+		t.Fatalf("Unwrap() = %v, want an error with message %q", root, "boom")
+	}
+	var se *StdErr
+	if errors.As(root, &se) {
+		t.Fatal("root cause should be a plain error, not *StdErr")
+	}
+}
+
+func TestHelpersTolerateTypedNil(t *testing.T) {
+	// A nil *StdErr stored in an error interface is non-nil; the package-level
+	// helpers must return zero values rather than panic.
+	var err error = Wrap(nil)
+	if Code(err) != "" || HTTPStatus(err) != 0 || StackTrace(err) != nil {
+		t.Fatal("helpers should return zero values for a typed-nil *StdErr")
+	}
+}
+
+func TestWrapAndOpaqueNilReturnNil(t *testing.T) {
+	if Wrap(nil) != nil || Opaque(nil, "x") != nil {
+		t.Fatal("Wrap/Opaque should return a nil error for nil input")
+	}
+}
+
+func TestOptionsCodeAndHTTPStatus(t *testing.T) {
+	inner := New("inner", WithOptions(Options{Code: "INNER", HTTPStatus: http.StatusBadRequest}))
+
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   string
+		wantStatus int
+	}{
+		{"plain error has none", errors.New("x"), "", 0},
+		{"set directly", inner, "INNER", http.StatusBadRequest},
+		{"out-of-range status ignored", New("x", WithOptions(Options{HTTPStatus: 42})), "", 0},
+		{
+			"inherited through Wrap",
+			Wrap(fmt.Errorf("outer: %w", inner)),
+			"INNER",
+			http.StatusBadRequest,
+		},
+		{"inherited through Opaque", Opaque(inner, "hidden"), "INNER", http.StatusBadRequest},
+		{"inherited across foreign link", Wrap(errWrap{inner}), "INNER", http.StatusBadRequest},
+		{
+			"outer overrides",
+			Wrap(inner, WithOptions(Options{Code: "OUTER", HTTPStatus: http.StatusConflict})),
+			"OUTER", http.StatusConflict,
+		},
+		{
+			"last WithOptions wins whole",
+			New("x",
+				WithOptions(Options{Code: "FIRST", HTTPStatus: http.StatusBadRequest}),
+				WithOptions(Options{Code: "SECOND"}),
+			),
+			"SECOND", 0,
+		},
+		{"nil Option ignored", New("x", nil), "", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Code(tt.err); got != tt.wantCode {
+				t.Fatalf("Code() = %q, want %q", got, tt.wantCode)
+			}
+			if got := HTTPStatus(tt.err); got != tt.wantStatus {
+				t.Fatalf("HTTPStatus() = %d, want %d", got, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestStackTraceDefaultIsCallSiteOnly(t *testing.T) {
+	cause := errors.New("x")
+	opts := WithOptions(Options{Code: "C"})
+
+	tests := []struct {
+		name string
+		mk   func() (error, int)
+	}{
+		{"New", func() (error, int) { return New("m"), callerLine() }},
+		{"Wrap", func() (error, int) { return Wrap(cause), callerLine() }},
+		{"Opaque", func() (error, int) { return Opaque(cause, "m"), callerLine() }},
+		{"with options", func() (error, int) { return New("m", opts), callerLine() }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err, line := tt.mk()
+			assertTrace(t, err, thisFile(t), line)
+		})
+	}
+}
+
+func TestStackTraceSkipFramesPointsAtHelperCaller(t *testing.T) {
+	helper := func() error { return New("m", WithOptions(Options{SkipFrames: 1})) }
+	err, line := helper(), callerLine()
+	assertTrace(t, err, thisFile(t), line)
+}
+
+func TestStackTraceDepthCapturesMore(t *testing.T) {
+	err, line := New("m", WithOptions(Options{TraceDepth: 3})), callerLine()
+	frames := StackTrace(err)
+	if len(frames) != 3 {
+		t.Fatalf("len(trace) = %d, want 3", len(frames))
+	}
+	if frames[0].File != thisFile(t) || frames[0].Line != line {
+		t.Fatalf("top frame = %s:%d, want line %d", frames[0].File, frames[0].Line, line)
 	}
 }
 
 func TestStackTraceReusedFromCause(t *testing.T) {
-	inner := New(nil, Options{Message: "inner"})
-	innerTop := inner.StackTrace()[0]
+	inner, line := New("inner"), callerLine()
 
-	outer := New(inner, Options{Message: "outer"})
-	outerTop := outer.StackTrace()[0]
-
-	if innerTop != outerTop {
-		t.Fatalf("outer trace top = %+v, want reused inner top %+v", outerTop, innerTop)
+	for name, outer := range map[string]error{
+		"Wrap":   Wrap(fmt.Errorf("outer: %w", inner)),
+		"Opaque": Opaque(inner, "outer"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			assertTrace(t, outer, thisFile(t), line)
+		})
 	}
 }
 
-func TestPackageHelpers(t *testing.T) {
-	plain := errors.New("plain")
-	if Code(plain) != "" || Status(plain) != 0 || StackTrace(plain) != nil {
-		t.Fatal("helpers should return zero values for a non-standard error")
-	}
-
-	err := New(plain, Options{Message: "wrapped", Code: "C", Status: 503})
-	if Code(err) != "C" {
-		t.Fatalf("Code() = %q, want %q", Code(err), "C")
-	}
-	if Status(err) != 503 {
-		t.Fatalf("Status() = %d, want 503", Status(err))
-	}
-	if len(StackTrace(err)) == 0 {
-		t.Fatal("StackTrace() should return frames for a standard error")
+func TestStackTraceNilForPlainError(t *testing.T) {
+	if StackTrace(errors.New("plain")) != nil {
+		t.Fatal("StackTrace should be nil for a non-standard error")
 	}
 }
 
-func TestErrorsAsFindsStandardError(t *testing.T) {
-	err := New(errors.New("x"), Options{Message: "y", Code: "Z"})
-	var se *StdErr
-	if !errors.As(err, &se) {
-		t.Fatal("errors.As should find *StdErr")
+// assertTrace checks that err's trace is exactly one frame at file:line.
+func assertTrace(t *testing.T, err error, file string, line int) {
+	t.Helper()
+	frames := StackTrace(err)
+	if len(frames) != 1 {
+		t.Fatalf("len(trace) = %d, want 1 (call site only): %+v", len(frames), frames)
 	}
-	if se.Code() != "Z" {
-		t.Fatalf("Code() = %q, want %q", se.Code(), "Z")
+	if got := frames[0]; got.File != file || got.Line != line {
+		t.Fatalf("frame = %s:%d, want %s:%d", got.File, got.Line, file, line)
+	}
+	if !strings.HasPrefix(frames[0].Function, "github.com/xwinata/gorontalo/pkg/stderr.Test") {
+		t.Fatalf("frame function = %q, want a test function", frames[0].Function)
 	}
 }

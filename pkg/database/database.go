@@ -111,16 +111,20 @@ func (c Config) dsn() (driver, dsn string, err error) {
 		// SQLite is file-based; Database holds the file path.
 		return "sqlite", c.Database, nil
 	case "":
-		return "", "", stderr.New(nil, stderr.Options{
-			Message: fmt.Sprintf("database %q: dialect is required", c.Name),
-			Code:    "DIALECT_REQUIRED",
-			Status:  http.StatusBadRequest,
-		})
+		return "", "", stderr.New(
+			fmt.Sprintf("database %q: dialect is required", c.Name),
+			stderr.WithOptions(stderr.Options{
+				Code:       "DIALECT_REQUIRED",
+				HTTPStatus: http.StatusBadRequest,
+			}),
+		)
 	default:
-		return "", "", stderr.New(nil, stderr.Options{
-			Message: fmt.Sprintf("database %q: unsupported dialect %q", c.Name, c.Dialect),
-			Code:    "UNSUPPORTED_DIALECT",
-			Status:  http.StatusBadRequest,
-		})
+		return "", "", stderr.New(
+			fmt.Sprintf("database %q: unsupported dialect %q", c.Name, c.Dialect),
+			stderr.WithOptions(stderr.Options{
+				Code:       "UNSUPPORTED_DIALECT",
+				HTTPStatus: http.StatusBadRequest,
+			}),
+		)
 	}
 }

@@ -3,35 +3,47 @@
 # stderr
 
 ```go
-import "gorontalo/pkg/stderr"
+import "github.com/xwinata/gorontalo/pkg/stderr"
 ```
 
-Package stderr wraps errors with a contextual message, a captured stack trace, an application\-level error code, and an HTTP status. It builds on gorontalo/pkg/tracer for stack capture and has no third\-party dependencies.
+Package stderr provides errors that carry a captured stack trace, an application\-level error code, and an HTTP status. It builds on gorontalo/pkg/tracer for stack capture and has no third\-party dependencies.
 
-A standard error preserves the original error chain, so errors.Is and errors.As keep working. The stack trace is captured once, at the point an ordinary error is first wrapped; wrapping an already\-wrapped error reuses the original trace instead of capturing a new one.
+There are three constructors:
 
-The code and status travel with the error so transport layers can report them without a separate lookup. The application error code is distinct from the HTTP status: the code identifies the failure to the application and its clients \(e.g. "USER\_NOT\_FOUND"\), while the status is the HTTP status an API should return \(e.g. 404\). Use errors.As with \*StdErr to read them back.
+- New\(msg\) creates an error with the given message and records the stack trace at the call site.
+- Wrap\(err\) records a stack trace on an existing error without changing its message.
+- Opaque\(err, msg\) reports only msg from Error\(\) but keeps err reachable through errors.Is, errors.As, and Unwrap, so internal causes are not leaked in messages shown to clients.
 
-Construction uses a single New constructor that takes the cause to wrap as its first argument and an Options struct as its second, so every call site names the fields it sets and the zero value of Options yields sensible defaults.
+Messages are plain strings; format them with fmt.Sprintf, or with fmt.Errorf and %w before passing the result to Wrap, as needed.
 
-When New wraps another \*StdErr, any of Message, Code, and Status left empty on Options is inherited from the nearest wrapped \*StdErr that sets it. This means re\-wrapping only needs to set the fields that change: adding a message leaves the original code and status in place.
+A \*StdErr preserves the original error chain, so errors.Is and errors.As keep working. The stack trace is captured once, where an error first enters this package; wrapping an error that already carries one reuses the original trace instead of capturing a new one. By default only the call\-site frame is recorded; set Options.TraceDepth to capture more of the stack.
+
+The code and status travel with the error so transport layers can report them without a separate lookup. The application error code is distinct from the HTTP status: the code identifies the failure to the application and its clients \(e.g. "USER\_NOT\_FOUND"\), while the status is the HTTP status an API should return \(e.g. 404\). Both are looked up down the chain, so an outer error that sets neither reports the nearest inner values.
+
+Code, HTTP status, and trace settings are supplied through the Options parameter struct, passed to any constructor as WithOptions\(opts\). The zero value of Options is valid.
 
 ### Usage
 
 ```
-if err := db.Load(ctx, id); err != nil {
-    return stderr.New(err, stderr.Options{
-        Message: "load user",
-        Code:    "USER_NOT_FOUND",
-        Status:  http.StatusNotFound,
-    })
-}
-```
+// A new error with a captured stack trace.
+return stderr.New("invalid state")
 
-To originate a new error chain rather than wrap an existing one, pass a nil cause:
+// Attach a code and HTTP status.
+return stderr.Wrap(
+    fmt.Errorf("load user %d: %w", id, err),
+    stderr.WithOptions(stderr.Options{
+        Code:       "USER_NOT_FOUND",
+        HTTPStatus: http.StatusNotFound,
+    }),
+)
 
-```
-return stderr.New(nil, stderr.Options{Message: "invalid state"})
+// Record a stack trace only; the message is unchanged.
+return stderr.Wrap(err)
+
+// Hide the cause from the message but keep it for errors.Is/As and logs.
+return stderr.Opaque(err, "internal error", stderr.WithOptions(
+    stderr.Options{HTTPStatus: http.StatusInternalServerError},
+))
 ```
 
 Reading the metadata back:
@@ -39,90 +51,116 @@ Reading the metadata back:
 ```
 var se *stderr.StdErr
 if errors.As(err, &se) {
-    log.Println(se.Code(), se.Status(), se.StackTrace())
+    log.Println(se.Code(), se.HTTPStatus(), se.StackTrace())
 }
+```
+
+Wrap and Opaque return a nil \*StdErr when err is nil. Calling a method on a nil \*StdErr panics, so check the result before using it. Beware Go's typed\-nil rule: a nil \*StdErr stored in an error interface is not equal to nil. Check err before wrapping rather than returning stderr.Wrap\(err\) unconditionally:
+
+```
+if err != nil {
+    return stderr.Wrap(err)
+}
+return nil
 ```
 
 ## Index
 
 - [func Code\(err error\) string](<#Code>)
+- [func HTTPStatus\(err error\) int](<#HTTPStatus>)
 - [func StackTrace\(err error\) \[\]tracer.Frame](<#StackTrace>)
-- [func Status\(err error\) int](<#Status>)
+- [type Option](<#Option>)
+  - [func WithOptions\(opts Options\) Option](<#WithOptions>)
 - [type Options](<#Options>)
 - [type StdErr](<#StdErr>)
-  - [func New\(err error, opts Options\) \*StdErr](<#New>)
+  - [func New\(msg string, opts ...Option\) \*StdErr](<#New>)
+  - [func Opaque\(err error, msg string, opts ...Option\) \*StdErr](<#Opaque>)
+  - [func Wrap\(err error, opts ...Option\) \*StdErr](<#Wrap>)
   - [func \(e \*StdErr\) Code\(\) string](<#StdErr.Code>)
   - [func \(e \*StdErr\) Error\(\) string](<#StdErr.Error>)
+  - [func \(e \*StdErr\) HTTPStatus\(\) int](<#StdErr.HTTPStatus>)
   - [func \(e \*StdErr\) StackTrace\(\) \[\]tracer.Frame](<#StdErr.StackTrace>)
-  - [func \(e \*StdErr\) Status\(\) int](<#StdErr.Status>)
   - [func \(e \*StdErr\) Unwrap\(\) error](<#StdErr.Unwrap>)
 
 
 <a name="Code"></a>
-## func [Code](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L254>)
+## func [Code](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L208>)
 
 ```go
 func Code(err error) string
 ```
 
-Code returns the application error code carried by the nearest \*StdErr in err's chain, or "" when none is present.
+Code returns the application error code carried by the nearest \*StdErr in err's chain, or "" when none is present or it is a nil \*StdErr.
+
+<a name="HTTPStatus"></a>
+## func [HTTPStatus](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L218>)
+
+```go
+func HTTPStatus(err error) int
+```
+
+HTTPStatus returns the HTTP status carried by the nearest \*StdErr in err's chain, or 0 when none is present or it is a nil \*StdErr.
 
 <a name="StackTrace"></a>
-## func [StackTrace](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L274>)
+## func [StackTrace](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L228>)
 
 ```go
 func StackTrace(err error) []tracer.Frame
 ```
 
-StackTrace returns the stack trace carried by the nearest \*StdErr in err's chain, or nil when none is present.
+StackTrace returns the stack trace carried by the nearest \*StdErr in err's chain, or nil when none is present or it is a nil \*StdErr.
 
-<a name="Status"></a>
-## func [Status](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L264>)
+<a name="Option"></a>
+## type [Option](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/options.go#L18>)
+
+Option customizes an error built by New, Wrap, or Opaque. Create one with WithOptions.
 
 ```go
-func Status(err error) int
+type Option func(*resolvedOptions)
 ```
 
-Status returns the HTTP status carried by the nearest \*StdErr in err's chain, or 0 when none is present.
+<a name="WithOptions"></a>
+### func [WithOptions](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/options.go#L22>)
+
+```go
+func WithOptions(opts Options) Option
+```
+
+WithOptions applies the code, HTTP status, and trace settings in opts. If several are passed to one constructor, the last one wins as a whole.
 
 <a name="Options"></a>
-## type [Options](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L72-L97>)
+## type [Options](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/options.go#L41-L61>)
 
-Options configures a StdErr created by New. The zero value is valid: it produces an error with no code, no status, and the default trace settings. Only Message is normally required.
+Options carries the application metadata and trace settings for an error. It is a parameter struct: set only the fields you need and pass it to WithOptions. The zero value is valid and selects the defaults.
 
 ```go
 type Options struct {
-    // Message is the contextual message for this error. When empty and the
-    // cause passed to New unwraps to another *StdErr, it is inherited from the
-    // nearest ancestor *StdErr that has one.
-    Message string
-
     // Code is the application-level error code (e.g. "USER_NOT_FOUND"). Empty
-    // means no code is set at this level; when the cause unwraps to another *StdErr,
-    // an empty Code is inherited from the nearest ancestor *StdErr that sets one.
+    // means none is set at this level; Code then reports the code of the
+    // nearest wrapped *StdErr that has one.
     Code string
 
-    // Status is the HTTP status an API should return (e.g. 404). Values outside
-    // 100–599 are ignored, leaving no status set at this level; when the cause
-    // unwraps to another *StdErr, an unset Status is inherited from the nearest
-    // ancestor *StdErr that sets one.
-    Status int
+    // HTTPStatus is the HTTP status an API should return (e.g. 404). Values outside
+    // 100–599 are ignored; HTTPStatus then reports the status of the nearest
+    // wrapped *StdErr that has one.
+    HTTPStatus int
 
     // SkipFrames adds to the number of leading stack frames skipped when the
-    // trace is captured. Use it from helpers that call New so their own frames
-    // do not appear. Negative values are ignored.
+    // trace is captured. Use it from helpers that call into this package so
+    // their own frames do not appear. Negative values are ignored.
     SkipFrames int
 
-    // TraceDepth caps the number of stack frames captured. Values < 1 keep the
-    // default depth.
+    // TraceDepth is the number of stack frames captured, starting at the call
+    // site. Values < 1 keep the default of 1, which records only the call
+    // site.
     TraceDepth int
 }
 ```
 
 <a name="StdErr"></a>
-## type [StdErr](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L102-L113>)
+## type [StdErr](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L85-L93>)
 
-StdErr is an error carrying a message, an optional cause, a captured stack trace, an application\-level error code, and an HTTP status. Create one with New and inspect it with errors.As.
+StdErr is an error carrying a message, an optional cause, a captured stack trace, an application\-level error code, and an HTTP status. Create one with New, Wrap, or Opaque and inspect it with errors.As.
 
 ```go
 type StdErr struct {
@@ -131,18 +169,34 @@ type StdErr struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L124>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L100>)
 
 ```go
-func New(err error, opts Options) *StdErr
+func New(msg string, opts ...Option) *StdErr
 ```
 
-New creates a \*StdErr wrapping err. When err is nil the result originates a new error chain; otherwise it wraps err, preserving the chain for errors.Is and errors.As. The stack trace is captured at this call unless the wrapped error already carries one, in which case it is reused.
+New returns a \*StdErr with the given message and a stack trace captured at this call. The message is used verbatim: compose it with fmt.Sprintf first if it needs formatting. The result unwraps to errors.New\(msg\). To attach a cause, use Wrap or Opaque. Pass WithOptions to set a code, HTTP status, or trace settings.
 
-When err unwraps to another \*StdErr, any of Message, Code, and Status left empty on opts are inherited from the nearest ancestor \*StdErr that sets them. This lets a caller re\-wrap a standard error to add context to one field \(say, a message\) while the code and status flow up unchanged.
+<a name="Opaque"></a>
+### func [Opaque](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L119>)
+
+```go
+func Opaque(err error, msg string, opts ...Option) *StdErr
+```
+
+Opaque returns an error whose Error\(\) is msg alone, hiding err's message, while err stays reachable through Unwrap, errors.Is, and errors.As and its stack trace, code, and status are recorded. It returns a nil \*StdErr when err is nil.
+
+<a name="Wrap"></a>
+### func [Wrap](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L108>)
+
+```go
+func Wrap(err error, opts ...Option) *StdErr
+```
+
+Wrap returns err annotated with a stack trace, leaving its message unchanged. It returns a nil \*StdErr when err is nil. If err already carries a stack trace, that trace is reused. To add context to the message, wrap it first with fmt.Errorf and %w.
 
 <a name="StdErr.Code"></a>
-### func \(\*StdErr\) [Code](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L210>)
+### func \(\*StdErr\) [Code](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L174>)
 
 ```go
 func (e *StdErr) Code() string
@@ -151,39 +205,39 @@ func (e *StdErr) Code() string
 Code returns the application\-level error code. When this error does not set one, Code looks down the chain for the nearest \*StdErr that does and returns its code; it returns "" when none is found.
 
 <a name="StdErr.Error"></a>
-### func \(\*StdErr\) [Error](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L190>)
+### func \(\*StdErr\) [Error](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L158>)
 
 ```go
 func (e *StdErr) Error() string
 ```
 
-Error implements the error interface. It renders the message followed by the cause, if any, so the chain reads from outermost to innermost. When the message was inherited from the cause \(so it already equals the cause's rendered form\), it is not repeated.
+Error implements the error interface. For an opaque error it is the message alone; otherwise it is the cause's message.
+
+<a name="StdErr.HTTPStatus"></a>
+### func \(\*StdErr\) [HTTPStatus](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L188>)
+
+```go
+func (e *StdErr) HTTPStatus() int
+```
+
+HTTPStatus returns the HTTP status. When this error does not set one, HTTPStatus looks down the chain for the nearest \*StdErr that does and returns its status; it returns 0 when none is found.
 
 <a name="StdErr.StackTrace"></a>
-### func \(\*StdErr\) [StackTrace](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L238>)
+### func \(\*StdErr\) [StackTrace](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L202>)
 
 ```go
 func (e *StdErr) StackTrace() []tracer.Frame
 ```
 
-StackTrace returns the captured call stack. If this error wraps another \*StdErr, it returns that error's trace so the origin frames are preserved. Otherwise it captures the trace on first call and caches it.
-
-<a name="StdErr.Status"></a>
-### func \(\*StdErr\) [Status](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L224>)
-
-```go
-func (e *StdErr) Status() int
-```
-
-Status returns the HTTP status. When this error does not set one, Status looks down the chain for the nearest \*StdErr that does and returns its status; it returns 0 when none is found.
+StackTrace returns the frames captured when the error \(or the innermost wrapped \*StdErr\) was created. By default this is only the call\-site frame; set Options.TraceDepth to capture more.
 
 <a name="StdErr.Unwrap"></a>
-### func \(\*StdErr\) [Unwrap](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L203>)
+### func \(\*StdErr\) [Unwrap](<https://github.com/xwinata/gorontalo/blob/main/pkg/stderr/stderr.go#L167>)
 
 ```go
 func (e *StdErr) Unwrap() error
 ```
 
-Unwrap returns the wrapped cause, enabling errors.Is and errors.As to walk the chain.
+Unwrap returns the wrapped cause, enabling errors.Is and errors.As to walk the chain. This holds for opaque errors too.
 
 Generated by [gomarkdoc](<https://github.com/princjef/gomarkdoc>)

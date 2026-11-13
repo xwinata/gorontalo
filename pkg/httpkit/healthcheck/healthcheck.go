@@ -94,11 +94,13 @@ func (s *Status) UnmarshalJSON(data []byte) error {
 	case "unavailable":
 		*s = StatusUnavailable
 	default:
-		return stderr.New(nil, stderr.Options{
-			Message: fmt.Sprintf("healthcheck: unknown status %q", label),
-			Code:    "INVALID_STATUS",
-			Status:  http.StatusBadRequest,
-		})
+		return stderr.New(
+			fmt.Sprintf("healthcheck: unknown status %q", label),
+			stderr.WithOptions(stderr.Options{
+				Code:       "INVALID_STATUS",
+				HTTPStatus: http.StatusBadRequest,
+			}),
+		)
 	}
 	return nil
 }

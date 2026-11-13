@@ -3,7 +3,7 @@
 # logger
 
 ```go
-import "gorontalo/pkg/logger"
+import "github.com/xwinata/gorontalo/pkg/logger"
 ```
 
 Package logger provides structured logging built entirely on the standard library's log/slog. It has no third\-party dependencies.

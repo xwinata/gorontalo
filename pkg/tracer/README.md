@@ -3,7 +3,7 @@
 # tracer
 
 ```go
-import "gorontalo/pkg/tracer"
+import "github.com/xwinata/gorontalo/pkg/tracer"
 ```
 
 Package tracer captures runtime call\-stack information for debugging and error diagnostics.

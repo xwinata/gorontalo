@@ -112,11 +112,13 @@ func TestRequestIDPropagatedFromHeader(t *testing.T) {
 func TestErrorStatusAndErrorCodeHeader(t *testing.T) {
 	log, _ := captureLogs(t)
 	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
-		return nil, stderr.New(nil, stderr.Options{
-			Message: "user not found",
-			Code:    "USER_NOT_FOUND",
-			Status:  http.StatusNotFound,
-		})
+		return nil, stderr.New(
+			"user not found",
+			stderr.WithOptions(stderr.Options{
+				Code:       "USER_NOT_FOUND",
+				HTTPStatus: http.StatusNotFound,
+			}),
+		)
 	}, RouteConfig{})
 
 	rec := do(h, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -164,11 +166,13 @@ func TestPlainErrorDefaultsToInternalServerError(t *testing.T) {
 func TestErrorIsLogged(t *testing.T) {
 	log, buf := captureLogs(t)
 	h := New(Config{Logger: log}).Wrap(func(http.ResponseWriter, *http.Request) (any, error) {
-		return nil, stderr.New(nil, stderr.Options{
-			Message: "kaboom",
-			Code:    "X",
-			Status:  http.StatusBadGateway,
-		})
+		return nil, stderr.New(
+			"kaboom",
+			stderr.WithOptions(stderr.Options{
+				Code:       "X",
+				HTTPStatus: http.StatusBadGateway,
+			}),
+		)
 	}, RouteConfig{})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -288,11 +292,13 @@ func TestCustomErrorCodeHeader(t *testing.T) {
 	log, _ := captureLogs(t)
 	h := New(Config{ErrorCodeHeader: "X-App-Error", Logger: log}).Wrap(
 		func(http.ResponseWriter, *http.Request) (any, error) {
-			return nil, stderr.New(nil, stderr.Options{
-				Message: "nope",
-				Code:    "E_NOPE",
-				Status:  http.StatusBadRequest,
-			})
+			return nil, stderr.New(
+				"nope",
+				stderr.WithOptions(stderr.Options{
+					Code:       "E_NOPE",
+					HTTPStatus: http.StatusBadRequest,
+				}),
+			)
 		},
 		RouteConfig{},
 	)

@@ -67,6 +67,7 @@ package fileconfig
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -154,20 +155,24 @@ func (l *Loader[T]) Load(ctx context.Context) (*T, error) {
 
 	var out T
 	if err := l.cfg.decode(data, &out); err != nil {
-		return nil, stderr.New(err, stderr.Options{
-			Message: "fileconfig: decode " + l.cfg.path,
-			Code:    CodeDecodeFailed,
-			Status:  http.StatusUnprocessableEntity,
-		})
+		return nil, stderr.Wrap(
+			fmt.Errorf("fileconfig: decode %s: %w", l.cfg.path, err),
+			stderr.WithOptions(stderr.Options{
+				Code:       CodeDecodeFailed,
+				HTTPStatus: http.StatusUnprocessableEntity,
+			}),
+		)
 	}
 
 	if l.cfg.validate != nil {
 		if err := l.cfg.validate(&out); err != nil {
-			return nil, stderr.New(err, stderr.Options{
-				Message: "fileconfig: validate " + l.cfg.path,
-				Code:    CodeValidationFailed,
-				Status:  http.StatusUnprocessableEntity,
-			})
+			return nil, stderr.Wrap(
+				fmt.Errorf("fileconfig: validate %s: %w", l.cfg.path, err),
+				stderr.WithOptions(stderr.Options{
+					Code:       CodeValidationFailed,
+					HTTPStatus: http.StatusUnprocessableEntity,
+				}),
+			)
 		}
 	}
 
@@ -199,22 +204,26 @@ func readFile(ctx context.Context, path string) ([]byte, error) {
 
 	select {
 	case <-ctx.Done():
-		return nil, stderr.New(ctx.Err(), stderr.Options{
-			Message: "fileconfig: read " + path,
-			Code:    CodeReadFailed,
-			Status:  http.StatusInternalServerError,
-		})
+		return nil, stderr.Wrap(
+			fmt.Errorf("fileconfig: read %s: %w", path, ctx.Err()),
+			stderr.WithOptions(stderr.Options{
+				Code:       CodeReadFailed,
+				HTTPStatus: http.StatusInternalServerError,
+			}),
+		)
 	case r := <-ch:
 		if r.err != nil {
 			status := http.StatusInternalServerError
 			if os.IsNotExist(r.err) {
 				status = http.StatusNotFound
 			}
-			return nil, stderr.New(r.err, stderr.Options{
-				Message: "fileconfig: read " + path,
-				Code:    CodeReadFailed,
-				Status:  status,
-			})
+			return nil, stderr.Wrap(
+				fmt.Errorf("fileconfig: read %s: %w", path, r.err),
+				stderr.WithOptions(stderr.Options{
+					Code:       CodeReadFailed,
+					HTTPStatus: status,
+				}),
+			)
 		}
 		return r.data, nil
 	}

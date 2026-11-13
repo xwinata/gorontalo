@@ -3,7 +3,7 @@
 # serialqueue
 
 ```go
-import "gorontalo/pkg/serialqueue"
+import "github.com/xwinata/gorontalo/pkg/serialqueue"
 ```
 
 Package serialqueue runs jobs one at a time in submission order.

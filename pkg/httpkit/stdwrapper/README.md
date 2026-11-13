@@ -3,7 +3,7 @@
 # stdwrapper
 
 ```go
-import "gorontalo/pkg/httpkit/stdwrapper"
+import "github.com/xwinata/gorontalo/pkg/httpkit/stdwrapper"
 ```
 
 Package stdwrapper adapts application handlers to a standard HTTP contract. It wraps a handler that returns a value and an error, reads standard request headers, writes a standard JSON response envelope, logs failures, and recovers from panics. It depends only on the standard library plus the in\-repo gorontalo/pkg/logger, gorontalo/pkg/tracer, and gorontalo/pkg/stderr packages.
@@ -13,7 +13,7 @@ A wrapped handler has the signature HandlerFunc: it returns the data to send on 
 - Request ID: it reads the request\-ID header \(HeaderRequestID by default, overridable with Config.RequestIDHeader\), generating a random one when absent, stores it on the request context \(retrievable with RequestIDFromContext\), and echoes it back on the same response header.
 - Response envelope: successful responses carry \{"data": ..., "message": ...\}; failed responses carry \{"message": ...\} with the error message. The envelope never includes the application error code.
 - Error code: the application\-level error code \(from gorontalo/pkg/stderr\) is sent on the error\-code response header \(HeaderErrorCode by default, overridable with Config.ErrorCodeHeader\), separate from the HTTP status.
-- Status mapping: the HTTP status comes from the error's Status when set \(see gorontalo/pkg/stderr\), falling back to 500 for errors and 200 for success.
+- Status mapping: the HTTP status comes from the error's HTTPStatus when set \(see gorontalo/pkg/stderr\), falling back to 500 for errors and 200 for success.
 - Logging: when a \[logger.Logger\] is supplied via Config.Logger, failures and recovered panics are logged at error level, including the request ID and \(for standard errors\) the captured stack trace. With no logger configured, request handling is unchanged but nothing is logged.
 - Panic recovery: a panic in the handler is recovered, logged, and turned into a 500 response so the server stays up.
 - Body limit: the request body is capped with http.MaxBytesReader \(DefaultMaxBodyBytes by default, overridable with Config.MaxBodyBytes, or disabled with a negative value\) before the handler runs, so any body read is bounded against unbounded client input.
@@ -33,11 +33,13 @@ mux.Handle("GET /users/{id}", std.Wrap(
     func(w http.ResponseWriter, r *http.Request) (any, error) {
         u, err := store.Load(r.Context(), r.PathValue("id"))
         if err != nil {
-            return nil, stderr.New(err, stderr.Options{
-                Message: "user not found",
-                Code:    "USER_NOT_FOUND",
-                Status:  http.StatusNotFound,
-            })
+            return nil, stderr.Wrap(
+                fmt.Errorf("user not found: %w", err),
+                stderr.WithOptions(stderr.Options{
+                    Code:       "USER_NOT_FOUND",
+                    HTTPStatus: http.StatusNotFound,
+                }),
+            )
         }
         return u, nil
     },
@@ -141,7 +143,7 @@ type Config struct {
 ```
 
 <a name="HandlerFunc"></a>
-## type [HandlerFunc](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L112>)
+## type [HandlerFunc](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L114>)
 
 HandlerFunc is the contract for a wrapped handler. It returns the data to send on success and an error on failure, rather than writing the response itself. A nil error means success; the returned data is placed in the response envelope's "data" field \(which is omitted when data is nil\).
 
@@ -167,7 +169,7 @@ type RouteConfig struct {
 ```
 
 <a name="Wrapper"></a>
-## type [Wrapper](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L131-L133>)
+## type [Wrapper](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L133-L135>)
 
 Wrapper adapts handlers to the standard contract using a shared, service\-wide Config. Create it with New and call Wrap for each route. A Wrapper is safe for concurrent use; its resolved config is immutable after New.
 
@@ -178,7 +180,7 @@ type Wrapper struct {
 ```
 
 <a name="New"></a>
-### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L124>)
+### func [New](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L126>)
 
 ```go
 func New(cfg Config) *Wrapper
@@ -187,7 +189,7 @@ func New(cfg Config) *Wrapper
 New creates a Wrapper carrying the service\-wide Config. Build one at startup and reuse it across routes; the zero\-value Config selects standard defaults. Per\-route settings are supplied to Wrap via RouteConfig.
 
 <a name="Wrapper.Wrap"></a>
-### func \(\*Wrapper\) [Wrap](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L139>)
+### func \(\*Wrapper\) [Wrap](<https://github.com/xwinata/gorontalo/blob/main/pkg/httpkit/stdwrapper/stdwrapper.go#L141>)
 
 ```go
 func (wp *Wrapper) Wrap(h HandlerFunc, rc RouteConfig) http.Handler

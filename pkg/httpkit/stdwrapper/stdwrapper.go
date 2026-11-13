@@ -23,7 +23,7 @@
 //     gorontalo/pkg/stderr) is sent on the error-code response header
 //     (HeaderErrorCode by default, overridable with Config.ErrorCodeHeader),
 //     separate from the HTTP status.
-//   - Status mapping: the HTTP status comes from the error's Status when set
+//   - Status mapping: the HTTP status comes from the error's HTTPStatus when set
 //     (see gorontalo/pkg/stderr), falling back to 500 for errors and 200
 //     for success.
 //   - Logging: when a [logger.Logger] is supplied via Config.Logger, failures
@@ -54,11 +54,13 @@
 //	    func(w http.ResponseWriter, r *http.Request) (any, error) {
 //	        u, err := store.Load(r.Context(), r.PathValue("id"))
 //	        if err != nil {
-//	            return nil, stderr.New(err, stderr.Options{
-//	                Message: "user not found",
-//	                Code:    "USER_NOT_FOUND",
-//	                Status:  http.StatusNotFound,
-//	            })
+//	            return nil, stderr.Wrap(
+//	                fmt.Errorf("user not found: %w", err),
+//	                stderr.WithOptions(stderr.Options{
+//	                    Code:       "USER_NOT_FOUND",
+//	                    HTTPStatus: http.StatusNotFound,
+//	                }),
+//	            )
 //	        }
 //	        return u, nil
 //	    },
@@ -196,7 +198,7 @@ func (wr *wrapper) writeError(
 	requestID string,
 	err error,
 ) {
-	status := stderr.Status(err)
+	status := stderr.HTTPStatus(err)
 	if status == 0 {
 		status = http.StatusInternalServerError
 	}
@@ -247,10 +249,12 @@ func (wr *wrapper) recoverPanic(ctx context.Context, w http.ResponseWriter, requ
 		return
 	}
 
-	err := stderr.New(nil, stderr.Options{
-		Message: "panic recovered",
-		Status:  http.StatusInternalServerError,
-	})
+	err := stderr.New(
+		"panic recovered",
+		stderr.WithOptions(stderr.Options{
+			HTTPStatus: http.StatusInternalServerError,
+		}),
+	)
 
 	if log := wr.cfg.logger; log != nil {
 		log.Error(ctx, err,

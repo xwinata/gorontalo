@@ -3,7 +3,7 @@
 # database
 
 ```go
-import "gorontalo/pkg/database"
+import "github.com/xwinata/gorontalo/pkg/database"
 ```
 
 ## Index

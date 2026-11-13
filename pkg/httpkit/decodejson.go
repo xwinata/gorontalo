@@ -3,6 +3,7 @@ package httpkit
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -125,18 +126,20 @@ func decode[T any](body io.Reader) (T, error) {
 // empty code) to classify the failure for its own clients.
 //
 // It is called directly from each exported entry point so the stderr
-// stack trace, captured at New, is a fixed two frames below the entry point
+// stack trace, captured at Wrap, is a fixed two frames below the entry point
 // (decodeError, then the entry point), making SkipFrames constant regardless of
 // which entry point or internal helper produced err.
 func decodeError(err error) error {
 	if err == nil {
 		return nil
 	}
-	return stderr.New(err, stderr.Options{
-		Message: "decode JSON body",
-		Status:  http.StatusBadRequest,
-		// Skip decodeError and the exported entry point so the trace starts at
-		// the application code that called in.
-		SkipFrames: 2,
-	})
+	return stderr.Wrap(
+		fmt.Errorf("decode JSON body: %w", err),
+		stderr.WithOptions(stderr.Options{
+			HTTPStatus: http.StatusBadRequest,
+			// Skip decodeError and the exported entry point so the trace starts
+			// at the application code that called in.
+			SkipFrames: 2,
+		}),
+	)
 }
