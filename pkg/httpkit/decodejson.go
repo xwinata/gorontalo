@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"gorontalo/pkg/httpkit/stdwrapper"
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/httpkit/stdwrapper"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 // DecodeJSON reads r's body and decodes it into a value of type T. It is the

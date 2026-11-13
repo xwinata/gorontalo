@@ -73,7 +73,7 @@ import (
 	"sync"
 	"time"
 
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 // Error codes reported on the *stderr.StdErr returned by New and Load.

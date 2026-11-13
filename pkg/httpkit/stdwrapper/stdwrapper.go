@@ -79,8 +79,8 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"gorontalo/pkg/logger"
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/logger"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 // HeaderRequestID is the default request/response header carrying the request

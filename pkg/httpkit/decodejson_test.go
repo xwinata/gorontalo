@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"gorontalo/pkg/httpkit/stdwrapper"
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/httpkit/stdwrapper"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 type createUser struct {

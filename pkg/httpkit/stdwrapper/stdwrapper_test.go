@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"gorontalo/pkg/logger"
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/logger"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 // captureLogs builds a Logger that writes JSON into a buffer and returns both.

@@ -1,6 +1,6 @@
 package stdwrapper
 
-import "gorontalo/pkg/logger"
+import "github.com/xwinata/gorontalo/pkg/logger"
 
 // Config holds the service-wide settings shared by every handler a Wrapper
 // produces. Create a Wrapper once with New(Config{...}) and reuse it across

@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"sync"
 
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 // Config holds the settings required to connect to a database.

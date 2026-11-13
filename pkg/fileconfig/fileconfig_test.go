@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"gorontalo/pkg/fileconfig"
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/fileconfig"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 type appConfig struct {

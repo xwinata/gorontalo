@@ -51,7 +51,7 @@ import (
 	"fmt"
 	"sync"
 
-	"gorontalo/pkg/tracer"
+	"github.com/xwinata/gorontalo/pkg/tracer"
 )
 
 const (

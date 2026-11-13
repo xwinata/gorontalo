@@ -37,7 +37,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 // Default paths served by a Handler, overridable with Config.HealthPath,

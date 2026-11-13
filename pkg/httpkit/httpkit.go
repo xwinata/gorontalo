@@ -34,7 +34,7 @@
 //	body, err := httpkit.DecodeJSON[CreateUser](r)
 package httpkit
 
-import "gorontalo/pkg/httpkit/stdwrapper"
+import "github.com/xwinata/gorontalo/pkg/httpkit/stdwrapper"
 
 // headerNames groups the standard HTTP header names used across httpkit. The
 // single exported value Headers is the instance callers reference; the type is

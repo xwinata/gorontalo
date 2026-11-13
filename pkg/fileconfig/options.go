@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"gorontalo/pkg/stderr"
+	"github.com/xwinata/gorontalo/pkg/stderr"
 )
 
 // Config customizes a Loader created by New. Only Path is required; every other
